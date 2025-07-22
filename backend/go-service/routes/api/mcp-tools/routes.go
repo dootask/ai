@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"dootask-ai/go-service/global"
@@ -58,10 +59,20 @@ func ListMCPTools(c *gin.Context) {
 		return
 	}
 
-	// 解析筛选条件
+	// 解析筛选条件（兼容filters[xxx]=yyy嵌套参数）
+	filtersMap := map[string]interface{}{}
+	for key, values := range c.Request.URL.Query() {
+		if strings.HasPrefix(key, "filters[") && strings.HasSuffix(key, "]") {
+			field := key[len("filters[") : len(key)-1]
+			if len(values) > 0 {
+				filtersMap[field] = values[0]
+			}
+		}
+	}
+
 	var filters MCPToolFilters
-	if req.Filters != nil {
-		filtersBytes, err := json.Marshal(req.Filters)
+	if len(filtersMap) > 0 {
+		filtersBytes, err := json.Marshal(filtersMap)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"code":    "VALIDATION_001",

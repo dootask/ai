@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"dootask-ai/go-service/global"
@@ -112,10 +113,29 @@ func ListConversations(c *gin.Context) {
 		return
 	}
 
-	// 解析筛选条件
+	// 解析筛选条件（兼容filters[xxx]=yyy嵌套参数）
+	filtersMap := map[string]interface{}{}
+	for key, values := range c.Request.URL.Query() {
+		if strings.HasPrefix(key, "filters[") && strings.HasSuffix(key, "]") {
+			field := key[len("filters[") : len(key)-1]
+			if len(values) > 0 {
+				filtersMap[field] = values[0]
+			}
+		}
+	}
+
+	// 兼容 agent_id 类型转换
+	if v, ok := filtersMap["agent_id"]; ok {
+		if s, ok := v.(string); ok {
+			if id, err := strconv.ParseInt(s, 10, 64); err == nil {
+				filtersMap["agent_id"] = id
+			}
+		}
+	}
+
 	var filters ConversationFilters
-	if req.Filters != nil {
-		filtersBytes, err := json.Marshal(req.Filters)
+	if len(filtersMap) > 0 {
+		filtersBytes, err := json.Marshal(filtersMap)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"code":    "VALIDATION_001",
