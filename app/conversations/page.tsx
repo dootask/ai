@@ -1,5 +1,6 @@
 'use client';
 
+import { Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +27,7 @@ export default function ConversationsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [conversationMessages, setConversationMessages] = useState<Message[]>([]);
@@ -36,6 +38,16 @@ export default function ConversationsPage() {
     averageResponseTime: 0,
   });
   const [error, setError] = useState<string | null>(null);
+
+  // 分页状态
+  const [pagination, setPagination] = useState({
+    current_page: 1,
+    page_size: 12,
+    total_items: 0,
+    total_pages: 0,
+  });
+
+  const [shouldFetch, setShouldFetch] = useState(true);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -49,19 +61,24 @@ export default function ConversationsPage() {
         filters.agent_id = parseInt(selectedAgent);
       }
 
-      if (searchQuery) {
-        filters.search = searchQuery;
+      if (debouncedSearchQuery) {
+        filters.search = debouncedSearchQuery;
       }
 
       // 获取对话列表
       const conversationResponse = await fetchConversations({
-        page: 1,
-        page_size: 50,
+        page: pagination.current_page,
+        page_size: pagination.page_size,
         filters,
       });
 
       // 使用新的响应数据结构
       setConversations(conversationResponse.data.items);
+      setPagination(prev => ({
+        ...prev,
+        total_items: conversationResponse.total_items,
+        total_pages: conversationResponse.total_pages,
+      }));
 
       // 设置统计信息
       setStatistics({
@@ -70,21 +87,16 @@ export default function ConversationsPage() {
         averageMessages: Math.round(conversationResponse.data.statistics.average_messages),
         averageResponseTime: conversationResponse.data.statistics.average_response_time,
       });
-
-      // 获取智能体列表
-      const agentResponse = await agentsApi.list({ page: 1, page_size: 100 });
-      setAgents(agentResponse.data.items);
     } catch (error) {
       console.error('加载数据失败:', error);
       setError('加载对话数据失败，请检查后端服务是否正常运行');
       // 如果API调用失败，显示空数据
       setConversations([]);
-      setAgents([]);
       setStatistics({ total: 0, today: 0, averageMessages: 0, averageResponseTime: 0 });
     } finally {
       setIsLoading(false);
     }
-  }, [selectedAgent, searchQuery]);
+  }, [selectedAgent, debouncedSearchQuery, pagination.current_page, pagination.page_size]);
 
   // 加载对话消息
   const loadConversationMessages = async (conversationId: string) => {
@@ -103,19 +115,40 @@ export default function ConversationsPage() {
     }
   };
 
+  // keyword输入防抖
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
-  // 过滤对话（前端过滤作为后端过滤的补充）
-  const filteredConversations = conversations.filter(conv => {
-    const matchesAgent = selectedAgent === 'all' || conv.agentId === selectedAgent;
-    const matchesSearch =
-      searchQuery === '' ||
-      conv.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      conv.agentName.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesAgent && matchesSearch;
-  });
+  // 只在debouncedSearchQuery或selectedAgent变化时重置分页到1
+  useEffect(() => {
+    if (pagination.current_page !== 1) {
+      setShouldFetch(false); // 暂停请求
+      setPagination(prev => ({ ...prev, current_page: 1 }));
+    } else {
+      setShouldFetch(true); // 允许请求
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAgent, debouncedSearchQuery]);
+
+  // 智能体选择变化时重置搜索框
+  const handleAgentChange = (value: string) => {
+    setSelectedAgent(value);
+    setSearchQuery(''); // 重置搜索框
+    setDebouncedSearchQuery(''); // 立即重置防抖搜索词
+  };
+
+  // 统一的数据加载逻辑
+  useEffect(() => {
+    if (!shouldFetch) {
+      setShouldFetch(true);
+      return;
+    }
+    loadData();
+  }, [loadData, shouldFetch]);
 
   const getResponseTimeBadge = (responseTime?: number) => {
     if (!responseTime) return <Badge variant="outline">-</Badge>;
@@ -142,6 +175,28 @@ export default function ConversationsPage() {
     setSelectedConversation(conversation);
     await loadConversationMessages(conversation.id);
   };
+
+  // 分页切换
+  const handlePageChange = (page: number) => {
+    setPagination(prev => ({ ...prev, current_page: page }));
+  };
+  // 每页数量切换
+  const handlePageSizeChange = (size: number) => {
+    setPagination(prev => ({ ...prev, page_size: size, current_page: 1 }));
+  };
+
+  // 只在页面初始化时加载一次智能体列表
+  useEffect(() => {
+    const loadAgents = async () => {
+      try {
+        const agentResponse = await agentsApi.list({ page: 1, page_size: 100 });
+        setAgents(agentResponse.data.items);
+      } catch {
+        setAgents([]);
+      }
+    };
+    loadAgents();
+  }, []);
 
   if (isLoading) {
     return (
@@ -238,7 +293,7 @@ export default function ConversationsPage() {
         <CardContent>
           <div className="flex flex-wrap gap-4">
             <div className="min-w-0 flex-1 sm:min-w-[200px]">
-              <Select value={selectedAgent} onValueChange={setSelectedAgent}>
+              <Select value={selectedAgent} onValueChange={handleAgentChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="选择智能体" />
                 </SelectTrigger>
@@ -275,7 +330,7 @@ export default function ConversationsPage() {
       <Card>
         <CardHeader>
           <CardTitle>对话记录</CardTitle>
-          <CardDescription>显示 {filteredConversations.length} 条对话记录</CardDescription>
+          <CardDescription>显示 {conversations.length} 条对话记录</CardDescription>
         </CardHeader>
         <CardContent>
           {error && (
@@ -288,14 +343,14 @@ export default function ConversationsPage() {
               </Button>
             </div>
           )}
-          {!error && filteredConversations.length === 0 && (
+          {!error && conversations.length === 0 && (
             <div className="py-12 text-center">
               <MessageSquare className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
               <h3 className="mb-2 text-lg font-medium">暂无对话记录</h3>
               <p className="text-muted-foreground">尚未找到匹配的对话记录</p>
             </div>
           )}
-          {!error && filteredConversations.length > 0 && (
+          {conversations.length > 0 && (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -308,7 +363,7 @@ export default function ConversationsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredConversations.map(conversation => (
+                {conversations.map(conversation => (
                   <TableRow key={conversation.id}>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -427,6 +482,23 @@ export default function ConversationsPage() {
           )}
         </CardContent>
       </Card>
+      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* 统计信息在最左侧 */}
+        <div className="text-muted-foreground text-sm">
+          共 {pagination.total_items} 条记录，第 {pagination.current_page} /{' '}
+          {Math.ceil(pagination.total_items / pagination.page_size)} 页
+        </div>
+        {/* 分页控件在右侧 */}
+        <Pagination
+          currentPage={pagination.current_page}
+          totalPages={Math.ceil(pagination.total_items / pagination.page_size)}
+          pageSize={pagination.page_size}
+          totalItems={pagination.total_items}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+          showTotal={false}
+        />
+      </div>
     </div>
   );
 }

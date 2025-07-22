@@ -1,5 +1,6 @@
 'use client';
 
+import { Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +20,6 @@ import { Activity, CheckCircle, Cpu, Edit, Eye, Key, MoreHorizontal, Plus, Setti
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { Pagination } from '@/components/pagination';
 
 export default function ModelsPage() {
   const { Confirm } = useAppContext();
@@ -32,23 +32,26 @@ export default function ModelsPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadModels = async () => {
-    try {
-      setIsLoading(true);
-      const data = await aiModelsApi.getAIModels({});
-      setModels(data.data.items);
-      setPagination(data);
-    } catch (error) {
-      console.error('加载AI模型列表失败:', error);
-      toast.error('加载AI模型列表失败');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadModels();
-  }, []);
+    // 分页参数变化时自动加载数据
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        const data = await aiModelsApi.getAIModels({
+          page: pagination.current_page,
+          page_size: pagination.page_size,
+        });
+        setModels(data.data.items);
+        setPagination(data);
+      } catch (error) {
+        console.error('加载AI模型列表失败:', error);
+        toast.error('加载AI模型列表失败');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, [pagination.current_page, pagination.page_size]);
 
   const handleToggleActive = async (modelId: number, isActive: boolean) => {
     try {
@@ -77,8 +80,8 @@ export default function ModelsPage() {
   const handleSetDefault = async (modelId: number) => {
     try {
       await aiModelsApi.updateAIModel(modelId, { is_default: true });
-      // 重新加载所有模型以确保只有一个默认模型
-      await loadModels();
+      // 通过重置分页参数触发刷新
+      setPagination(prev => ({ ...prev }));
       toast.success('已设为默认模型');
     } catch (error) {
       console.error('设置默认模型失败:', error);
@@ -129,6 +132,15 @@ export default function ModelsPage() {
     }
   };
 
+  // 分页切换
+  const handlePageChange = (page: number) => {
+    setPagination(prev => ({ ...prev, current_page: page }));
+  };
+  // 每页数量切换
+  const handlePageSizeChange = (size: number) => {
+    setPagination(prev => ({ ...prev, page_size: size, current_page: 1 }));
+  };
+
   // 统计数据
   const stats = {
     total: models.length,
@@ -177,6 +189,10 @@ export default function ModelsPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+        {/* 分页骨架屏 */}
+        <div className="mt-6 flex justify-center">
+          <div className="bg-muted h-10 w-48 animate-pulse rounded"></div>
         </div>
       </div>
     );
@@ -392,8 +408,8 @@ export default function ModelsPage() {
             totalPages={pagination.total_pages}
             pageSize={pagination.page_size}
             totalItems={pagination.total_items}
-            onPageChange={() => {}}
-            onPageSizeChange={() => {}}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
           />
         </>
       )}
