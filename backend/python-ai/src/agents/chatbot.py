@@ -16,12 +16,12 @@ async def chatbot(
         messages = previous["messages"] + messages
 
     model = get_model_by_provider(
-        config["configurable"].get("provider"),
-        config["configurable"].get("model", settings.DEFAULT_MODEL),
-        config["configurable"].get("agent_config", None),
+        config.get("configurable",{}).get("provider"),
+        config.get("configurable",{}).get("model", settings.DEFAULT_MODEL),
+        config.get("configurable",{}).get("agent_config", None),
     )
-    response = await model.ainvoke(messages)
-    print(response)
+    response = await model.ainvoke(messages, stream_usage=True)
+    # print(response)
     return entrypoint.final(
         value={"messages": [response]}, save={"messages": messages + [response]}
     )

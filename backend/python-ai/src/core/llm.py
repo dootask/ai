@@ -194,7 +194,7 @@ PROVIDER_MODEL_MAPPING = {
 def get_model_by_provider(
     provider_name: str, 
     model_name: str, 
-    config_tuple: Optional[dict] = None
+    config_tuple: dict | None
 ) -> ModelT:
     """
     根据提供商名称直接返回对应的模型实例

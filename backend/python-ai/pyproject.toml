@@ -59,7 +59,8 @@ dependencies = [
     "langchain-deepseek",
     "langchain-xai",
     "langchain_cohere",
-    "cohere <= 5.15.0"
+    "cohere <= 5.15.0",
+    "langchain_postgres"
 ]
 
 [dependency-groups]

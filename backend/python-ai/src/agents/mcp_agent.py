@@ -1,5 +1,4 @@
 from core import get_model_by_provider, settings
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import BaseMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -23,11 +22,11 @@ async def mcp_agent(
 
     # 2. 动态决定模型
     model = get_model_by_provider(
-        config["configurable"].get("provider", "openai"),
-        config["configurable"].get("model", settings.DEFAULT_MODEL),
-        config["configurable"].get("agent_config", None),
+        config.get("configurable",{}).get("provider", "openai"),
+        config.get("configurable",{}).get("model", settings.DEFAULT_MODEL),
+        config.get("configurable",{}).get("agent_config", None),
     )
-    config_tuple = config["configurable"].get("mcp_config", None)
+    config_tuple = config.get("configurable",{}).get("mcp_config", None)
     if config_tuple is None:
         config = {}
     mcp_config = dict(config_tuple) if config_tuple else {}

@@ -50,9 +50,9 @@ async def background(state: AgentState, config: RunnableConfig) -> AgentState:
     """This node is to demonstrate doing work before the interrupt"""
 
     m = get_model_by_provider(
-        config["configurable"].get("provider"),
-        config["configurable"].get("model", settings.DEFAULT_MODEL),
-        config["configurable"].get("agent_config", None),
+        config.get("configurable",{}).get("provider"),
+        config.get("configurable",{}).get("model", settings.DEFAULT_MODEL),
+        config.get("configurable",{}).get("agent_config", None),
     )
     model_runnable = wrap_model(m, background_prompt.format())
     response = await model_runnable.ainvoke(state, config)
@@ -88,7 +88,7 @@ async def determine_birthdate(
     """This node examines the conversation history to determine user's birthdate, checking store first."""
 
     # Attempt to get user_id for unique storage per user
-    user_id = config["configurable"].get("user_id")
+    user_id = config.get("configurable",{}).get("user_id")
     logger.info(f"[determine_birthdate] Extracted user_id: {user_id}")
     namespace = None
     key = "birthdate"
@@ -140,9 +140,9 @@ async def determine_birthdate(
 
     # If birthdate wasn't retrieved from store, proceed with extraction
     m = get_model_by_provider(
-        config["configurable"].get("provider"),
-        config["configurable"].get("model", settings.DEFAULT_MODEL),
-        config["configurable"].get("agent_config", None),
+        config.get("configurable",{}).get("provider"),
+        config.get("configurable",{}).get("model", settings.DEFAULT_MODEL),
+        config.get("configurable",{}).get("agent_config", None),
     )
     model_runnable = wrap_model(
         m.with_structured_output(BirthdateExtraction),
@@ -234,9 +234,9 @@ async def generate_response(state: AgentState, config: RunnableConfig) -> AgentS
     birthdate_str = birthdate.strftime("%B %d, %Y")  # Format for display
 
     m = get_model_by_provider(
-        config["configurable"].get("provider"),
-        config["configurable"].get("model", settings.DEFAULT_MODEL),
-        config["configurable"].get("agent_config", None),
+        config.get("configurable",{}).get("provider"),
+        config.get("configurable",{}).get("model", settings.DEFAULT_MODEL),
+        config.get("configurable",{}).get("agent_config", None),
     )
     model_runnable = wrap_model(
         m,

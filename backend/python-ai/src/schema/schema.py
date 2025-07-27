@@ -34,6 +34,28 @@ class ServiceMetadata(BaseModel):
         description="Default model used when none is specified.",
     )
 
+class DocumentInput(BaseModel):
+    """Input for document processing."""
+
+    knowledge_base: str = Field(
+        description="Knowledge base to store the processed documents.",
+        examples=["default_knowledge_base"],
+    )
+    provider: str = Field(
+        description="Provider of the embedding model.",
+        default="openai",
+        examples=["openai", "cohere", "google"],
+    )
+    model: str = Field(
+        description="Embedding model to use.",
+        default="text-embedding-3-small",
+        examples=["text-embedding-3-small", "text-embedding-ada-002"],
+    )
+    api_key: str | None = Field(
+        description="API key for the embedding provider (if required).",
+        default=None,
+        examples=["sk-xxxxxx"],
+    )
 
 class UserInput(BaseModel):
     """Basic user input for the agent."""
@@ -148,6 +170,10 @@ class ChatMessage(BaseModel):
         description="Custom message data.",
         default={},
     )
+    usage_metadata: dict[str, Any] = Field(
+        description="Usage metadata for the message.",
+        default={},
+    )
 
     def pretty_repr(self) -> str:
         """Get a pretty representation of the message."""
@@ -187,6 +213,27 @@ class Feedback(BaseModel):  # type: ignore[no-redef]
 
 class FeedbackResponse(BaseModel):
     status: Literal["success"] = "success"
+
+
+class ServiceMetadata(BaseModel):
+    """服务元数据，包括名称、版本等信息"""
+    
+    name: str = Field(
+        description="服务名称",
+        examples=["AI 助手服务"]
+    )
+    version: str = Field(
+        description="服务版本",
+        examples=["1.0.0"]
+    )
+    description: str = Field(
+        description="服务描述",
+        examples=["基于 LangGraph 的智能助手服务"]
+    )
+    available_agents: list[str] = Field(
+        description="可用的代理列表",
+        default=[]
+    )
 
 
 class ChatHistoryInput(BaseModel):
