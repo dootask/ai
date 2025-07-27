@@ -1,6 +1,7 @@
 package conversations
 
 import (
+	"database/sql"
 	"net/http"
 	"strconv"
 	"time"
@@ -8,9 +9,12 @@ import (
 	"dootask-ai/go-service/global"
 	"dootask-ai/go-service/pkg/utils"
 
+	"github.com/duke-git/lancet/v2/slice"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"gorm.io/gorm"
+
+	dootask "github.com/dootask/tools/server/go"
 )
 
 // RegisterRoutes 注册对话管理路由
@@ -239,6 +243,21 @@ func ListConversations(c *gin.Context) {
 			conversations[i].AgentName = conversations[i].Agent.Name
 		}
 		conversations[i].UserName = "用户" + conversations[i].DootaskUserID
+		dialogID, err := strconv.Atoi(conversations[i].DootaskChatID)
+		if err == nil {
+			dialogUsers, err := global.DooTaskClient.Client.GetDialogUser(dootask.GetDialogUserRequest{
+				DialogID: dialogID,
+				GetUser:  1,
+			})
+			if err == nil {
+				user, ok := slice.FindBy(dialogUsers, func(index int, item dootask.DialogMember) bool {
+					return item.UserID == int(global.DooTaskUser.UserID)
+				})
+				if ok {
+					conversations[i].UserName = user.Nickname
+				}
+			}
+		}
 
 		// 获取消息数量
 		var messageCount int64
@@ -259,7 +278,7 @@ func ListConversations(c *gin.Context) {
 	}
 
 	// 计算统计信息
-	stats := calculateConversationStatistics()
+	stats := calculateConversationStatistics(int64(global.DooTaskUser.UserID))
 
 	// 构造响应数据
 	data := ConversationListData{
@@ -322,8 +341,21 @@ func GetConversation(c *gin.Context) {
 		Where("conversation_id = ?", id).
 		Scan(&lastActivity)
 
-	// 计算平均响应时间（模拟）
-	averageResponseTime := 2.1
+	// 计算真实平均响应时间
+	var avgResponseTimeMs sql.NullFloat64
+	global.DB.Model(&Message{}).
+		Select("AVG(response_time_ms)").
+		Where("conversation_id = ? AND role = 'assistant' AND response_time_ms IS NOT NULL", id).
+		Scan(&avgResponseTimeMs)
+
+	var averageResponseTime float64
+	if avgResponseTimeMs.Valid {
+		// 转换为秒并保留小数
+		averageResponseTime = avgResponseTimeMs.Float64 / 1000.0
+	} else {
+		// 如果没有数据，默认为0
+		averageResponseTime = 0.0
+	}
 
 	// 填充额外信息
 	if conversation.Agent != nil {
@@ -483,34 +515,61 @@ func GetMessages(c *gin.Context) {
 
 // GetConversationStats 获取对话统计信息
 func GetConversationStats(c *gin.Context) {
-	stats := calculateConversationStatistics()
+	stats := calculateConversationStatistics(int64(global.DooTaskUser.UserID))
 	c.JSON(http.StatusOK, stats)
 }
 
 // calculateConversationStatistics 计算对话统计信息
-func calculateConversationStatistics() ConversationStatistics {
+func calculateConversationStatistics(userID int64) ConversationStatistics {
 	var stats ConversationStatistics
 
 	// 获取对话总数
-	global.DB.Model(&Conversation{}).Count(&stats.Total)
+	global.DB.Model(&Conversation{}).Where("dootask_user_id = ?", strconv.Itoa(int(userID))).Count(&stats.Total)
 
 	// 获取今日对话数
 	today := time.Now().Truncate(24 * time.Hour)
-	global.DB.Model(&Conversation{}).Where("created_at >= ?", today).Count(&stats.Today)
+	global.DB.Model(&Conversation{}).Where("created_at >= ? AND dootask_user_id = ?", today, strconv.Itoa(int(userID))).Count(&stats.Today)
 
 	// 获取活跃对话数
-	global.DB.Model(&Conversation{}).Where("is_active = true").Count(&stats.Active)
+	global.DB.Model(&Conversation{}).Where("is_active = true AND dootask_user_id = ?", strconv.Itoa(int(userID))).Count(&stats.Active)
 
 	// 计算平均消息数
 	if stats.Total > 0 {
 		var totalMessages int64
-		global.DB.Model(&Message{}).Count(&totalMessages)
+		global.DB.Model(&Message{}).Joins("LEFT JOIN conversations ON messages.conversation_id = conversations.id").Where("conversations.dootask_user_id = ?", strconv.Itoa(int(userID))).Count(&totalMessages)
 		stats.AverageMessages = float64(totalMessages) / float64(stats.Total)
 	}
 
-	// 模拟平均响应时间和成功率
-	stats.AverageResponseTime = 2.1
-	stats.SuccessRate = 98.5
+	// 计算平均响应时间
+	var averageResponseTime float64
+	global.DB.Raw(`
+		SELECT avg(m.response_time_ms) FROM agents a
+		LEFT JOIN conversations c ON a.id = c.agent_id
+		LEFT JOIN messages m ON c.id= m.conversation_id
+		WHERE a.user_id = ? AND m.status = 1 AND m.role = 'assistant'
+	`, global.DooTaskUser.UserID).Scan(&averageResponseTime)
+
+	stats.AverageResponseTime = averageResponseTime / 1000.0
+
+	// 计算成功率 - 成功消息数 / 总消息数
+	var successCount, totalCount int64
+
+	// 查询成功消息数
+	global.DB.Model(&Message{}).
+		Where("conversation_id IN (SELECT id FROM conversations WHERE dootask_user_id = ?) AND status = 1 AND role = 'assistant'", strconv.Itoa(int(userID))).
+		Count(&successCount)
+
+	// 查询总消息数
+	global.DB.Model(&Message{}).
+		Where("conversation_id IN (SELECT id FROM conversations WHERE dootask_user_id = ?) AND role = 'assistant'", strconv.Itoa(int(userID))).
+		Count(&totalCount)
+
+	var successRate float64
+	if totalCount > 0 {
+		successRate = float64(successCount) / float64(totalCount)
+	}
+
+	stats.SuccessRate = successRate * 100
 
 	return stats
 }

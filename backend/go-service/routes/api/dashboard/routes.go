@@ -3,10 +3,14 @@ package dashboard
 import (
 	"database/sql"
 	"net/http"
+	"strconv"
 	"time"
 
 	"dootask-ai/go-service/global"
 
+	dootask "github.com/dootask/tools/server/go"
+	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/duke-git/lancet/v2/slice"
 	"github.com/gin-gonic/gin"
 )
 
@@ -324,9 +328,10 @@ func getRecentAgents() []RecentAgent {
 			JOIN messages m ON m.conversation_id = c.id
 			GROUP BY c.agent_id
 		) last_used ON last_used.agent_id = a.id
+		WHERE a.user_id = ?
 		ORDER BY last_used DESC, a.created_at DESC
 		LIMIT 5
-	`, time.Now().Truncate(24*time.Hour)).Rows()
+	`, time.Now().Truncate(24*time.Hour), global.DooTaskUser.UserID).Rows()
 
 	if err != nil {
 		return agents
@@ -357,16 +362,17 @@ func getRecentConversations() []RecentConversation {
 	var conversations []RecentConversation
 
 	rows, err := global.DB.Raw(`
-		SELECT c.id, c.dootask_user_id, a.name as agent_name,
+		SELECT c.id, c.dootask_chat_id, c.dootask_user_id, a.name as agent_name,
 		       COUNT(m.id) as messages_count,
 		       MAX(m.created_at) as last_activity
 		FROM conversations c
 		JOIN agents a ON a.id = c.agent_id
 		LEFT JOIN messages m ON m.conversation_id = c.id
+		WHERE c.dootask_user_id = ?
 		GROUP BY c.id, c.dootask_user_id, a.name
 		ORDER BY last_activity DESC
 		LIMIT 5
-	`).Rows()
+	`, convertor.ToString(global.DooTaskUser.UserID)).Rows()
 
 	if err != nil {
 		return conversations
@@ -376,14 +382,31 @@ func getRecentConversations() []RecentConversation {
 	for rows.Next() {
 		var conv RecentConversation
 		var userID string
+		var dootaskChatID string
 		var lastActivity sql.NullTime
 
-		if err := rows.Scan(&conv.ID, &userID, &conv.AgentName,
+		if err := rows.Scan(&conv.ID, &dootaskChatID, &userID, &conv.AgentName,
 			&conv.MessagesCount, &lastActivity); err != nil {
 			continue
 		}
+		userName := "用户" + userID
+		dialogID, err := strconv.Atoi(dootaskChatID)
+		if err == nil {
+			dialogUsers, err := global.DooTaskClient.Client.GetDialogUser(dootask.GetDialogUserRequest{
+				DialogID: dialogID,
+				GetUser:  1,
+			})
+			if err == nil {
+				user, ok := slice.FindBy(dialogUsers, func(index int, item dootask.DialogMember) bool {
+					return item.UserID == int(global.DooTaskUser.UserID)
+				})
+				if ok {
+					userName = user.Nickname
+				}
+			}
+		}
 
-		conv.UserName = "用户" + userID // 简单模拟用户名
+		conv.UserName = userName
 		if lastActivity.Valid {
 			conv.LastActivity = lastActivity.Time
 		}

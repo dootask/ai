@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"dootask-ai/go-service/routes/api/conversations"
+
 	"gorm.io/datatypes"
 )
 
@@ -25,7 +27,19 @@ type Agent struct {
 	UpdatedAt      time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 
 	// 关联模型
-	AIModel *AIModel `gorm:"foreignKey:AIModelID" json:"ai_model,omitempty"`
+	AIModel       *AIModel                     `gorm:"foreignKey:AIModelID" json:"ai_model,omitempty"`
+	Conversations []conversations.Conversation `gorm:"foreignKey:AgentID" json:"conversations,omitempty"`
+
+	// 统计信息
+	Statistics *AgentStatistics `gorm:"-" json:"statistics,omitempty"`
+}
+
+// AgentStatistics 智能体统计信息
+type AgentStatistics struct {
+	TotalMessages       int64   `json:"total_messages"`
+	TodayMessages       int64   `json:"today_messages"`
+	AverageResponseTime float64 `json:"average_response_time"`
+	SuccessRate         float64 `json:"success_rate"`
 }
 
 // AIModel AI模型简化结构（用于关联查询）

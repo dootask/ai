@@ -122,6 +122,8 @@ func ListAgents(c *gin.Context) {
 	var agents []Agent
 	if err := query.
 		Preload("AIModel").
+		Preload("Conversations").
+		Preload("Conversations.Messages").
 		Order(orderBy).
 		Limit(req.PageSize).
 		Offset(req.GetOffset()).
@@ -132,6 +134,24 @@ func ListAgents(c *gin.Context) {
 			"data":    nil,
 		})
 		return
+	}
+
+	var averageResponseTime float64
+	global.DB.Raw(`
+		SELECT avg(m.response_time_ms) FROM agents a
+		LEFT JOIN conversations c ON a.id = c.agent_id
+		LEFT JOIN messages m ON c.id= m.conversation_id
+		WHERE a.user_id = ?
+	`, global.DooTaskUser.UserID).Scan(&averageResponseTime)
+
+	// 查询统计信息
+	for i, agent := range agents {
+
+		agent.Statistics = &AgentStatistics{
+			TotalMessages:       int64(len(agent.Conversations)),
+			AverageResponseTime: averageResponseTime,
+		}
+		agents[i] = agent
 	}
 
 	// 构造响应数据
