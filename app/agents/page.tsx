@@ -1,5 +1,6 @@
 'use client';
 
+import { defaultPagination, Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +18,6 @@ import { Activity, Bot, Edit, Eye, MessageSquare, MoreHorizontal, Plus, Trash2, 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { defaultPagination, Pagination } from '@/components/pagination';
 
 export default function AgentsPage() {
   const { Confirm } = useAppContext();
@@ -124,10 +124,10 @@ export default function AgentsPage() {
   const stats = {
     total: agents.length,
     active: agents.filter(agent => agent.is_active).length,
-    totalMessages: agents.reduce((sum, agent) => sum + (agent.statistics?.totalMessages || 0), 0),
+    totalMessages: agents.reduce((sum, agent) => sum + (agent.statistics?.total_messages || 0), 0),
     averageResponseTime:
       agents.length > 0
-        ? agents.reduce((sum, agent) => sum + (agent.statistics?.averageResponseTime || 1200), 0) / agents.length
+        ? agents.reduce((sum, agent) => sum + (agent.statistics?.average_response_time || 1200), 0) / agents.length
         : 0,
   };
 

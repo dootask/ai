@@ -144,6 +144,7 @@ func (h *Handler) Webhook(c *gin.Context) {
 		ConversationID: conversation.ID,
 		SendID:         req.SendId,
 		Role:           "user",
+		Content:        req.Text,
 	}
 	if err := global.DB.Create(&message).Error; err != nil {
 		fmt.Println("创建消息失败:", err)
@@ -176,6 +177,7 @@ func (h *Handler) Stream(c *gin.Context) {
 		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "流式消息错误")
 		return
 	}
+	fmt.Printf("%+v\n", req)
 
 	// 检查智能体是否存在
 	var agent agents.Agent
@@ -233,6 +235,9 @@ func (h *Handler) Stream(c *gin.Context) {
 	// 流式消息读取，阻塞式BRPop
 	isFirstLine := true
 
+	// 记录开始时间
+	startTime := time.Now()
+
 	c.Stream(func(w io.Writer) bool {
 		for {
 			// 检查context是否已取消
@@ -278,7 +283,7 @@ func (h *Handler) Stream(c *gin.Context) {
 				isFirstLine = false
 			}
 
-			handler.handleMessage(v, req, w)
+			handler.handleMessage(v, req, w, startTime, 1)
 		}
 	})
 }

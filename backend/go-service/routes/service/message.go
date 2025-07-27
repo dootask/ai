@@ -74,7 +74,7 @@ func (h *MessageHandler) handleTokenMessage(v StreamLineData, req WebhookRequest
 }
 
 // handleMessageMessage 处理message类型消息
-func (h *MessageHandler) handleMessageMessage(v StreamLineData, req WebhookRequest) {
+func (h *MessageHandler) handleMessageMessage(v StreamLineData, req WebhookRequest, startTime time.Time, status int) {
 	content, ok := v.Content.(map[string]any)
 	if !ok {
 		logError("Message消息内容类型错误", nil, "type:", v.Type, "content:", fmt.Sprintf("%v", v.Content))
@@ -93,7 +93,7 @@ func (h *MessageHandler) handleMessageMessage(v StreamLineData, req WebhookReque
 		return
 	}
 
-	h.updateMessage(req, StreamMessageData.Content)
+	h.createMessage(req, StreamMessageData.Content, startTime, status)
 	h.sendDooTaskMessage(req, StreamMessageData.Content)
 }
 
@@ -127,7 +127,7 @@ func (h *MessageHandler) parseErrorContent(content string) (*StreamErrorData, er
 }
 
 // handleErrorMessage 处理error类型消息
-func (h *MessageHandler) handleErrorMessage(v StreamLineData, req WebhookRequest, w io.Writer) {
+func (h *MessageHandler) handleErrorMessage(v StreamLineData, req WebhookRequest, w io.Writer, status int) {
 	if content, ok := v.Content.(string); ok {
 		StreamErrorData, err := h.parseErrorContent(content)
 		if err != nil {
@@ -136,7 +136,7 @@ func (h *MessageHandler) handleErrorMessage(v StreamLineData, req WebhookRequest
 		}
 
 		h.sendSSEResponse(w, req, "done", StreamErrorData.Error.Message)
-		h.updateMessage(req, StreamErrorData.Error.Message)
+		h.createMessage(req, StreamErrorData.Error.Message, time.Now(), status)
 		h.sendDooTaskMessage(req, StreamErrorData.Error.Message)
 	} else {
 		logError("Error消息内容类型错误", nil, "type:", v.Type, "content:", fmt.Sprintf("%v", v.Content))
@@ -149,26 +149,43 @@ func (h *MessageHandler) handleDone(req WebhookRequest, w io.Writer) {
 }
 
 // handleMessage 根据消息类型分发处理
-func (h *MessageHandler) handleMessage(v StreamLineData, req WebhookRequest, w io.Writer) {
+func (h *MessageHandler) handleMessage(v StreamLineData, req WebhookRequest, w io.Writer, startTime time.Time, status int) {
 	switch v.Type {
 	case "token":
 		h.handleTokenMessage(v, req, w)
 	case "message":
-		h.handleMessageMessage(v, req)
+		h.handleMessageMessage(v, req, startTime, status)
 	case "error":
-		h.handleErrorMessage(v, req, w)
+		h.handleErrorMessage(v, req, w, status)
 	default:
 		logError("未知消息类型", nil, "type:", v.Type, "send_id:", fmt.Sprintf("%d", req.SendId))
 	}
 }
 
-// updateMessage 更新消息
-func (h *MessageHandler) updateMessage(req WebhookRequest, content string) {
-	message := conversations.Message{}
-	h.db.Where("send_id = ?", req.SendId).First(&message)
-	if message.ID > 0 {
-		h.db.Model(&message).Update("content", content)
+// createMessage 创建消息
+func (h *MessageHandler) createMessage(req WebhookRequest, content string, startTime time.Time, status int) {
+	// 创建对话
+	var conversation conversations.Conversation
+	dialogId := strconv.Itoa(int(req.DialogId))
+	userID := strconv.Itoa(int(global.DooTaskUser.UserID))
+	if err := h.db.Where("dootask_user_id = ? AND dootask_chat_id = ?", userID, dialogId).First(&conversation).Error; err != nil {
+		logError("查询对话失败", err, "dialog_id:", dialogId, "user_id:", userID)
+		return
 	}
+
+	// 计算响应时间
+	responseTimeMs := int(time.Since(startTime).Milliseconds())
+
+	// 创建消息
+	message := conversations.Message{
+		ConversationID: conversation.ID,
+		SendID:         req.SendId,
+		Role:           "assistant",
+		Content:        content,
+		ResponseTimeMs: &responseTimeMs,
+		Status:         status,
+	}
+	h.db.Create(&message)
 }
 
 // logError 统一错误日志格式

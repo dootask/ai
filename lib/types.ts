@@ -134,10 +134,10 @@ export interface Agent {
 }
 
 export interface AgentStatistics {
-  totalMessages: number;
-  todayMessages: number;
-  averageResponseTime: number;
-  successRate: number;
+  total_messages: number;
+  today_messages: number;
+  average_response_time: number;
+  success_rate: number;
 }
 
 export interface CreateAgentRequest {

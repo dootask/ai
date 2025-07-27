@@ -37,6 +37,7 @@ export default function ConversationsPage() {
     today: 0,
     averageMessages: 0,
     averageResponseTime: 0,
+    successRate: 0,
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -73,13 +74,14 @@ export default function ConversationsPage() {
         today: conversationResponse.data.statistics.today,
         averageMessages: Math.round(conversationResponse.data.statistics.average_messages),
         averageResponseTime: conversationResponse.data.statistics.average_response_time,
+        successRate: conversationResponse.data.statistics.success_rate,
       });
     } catch (error) {
       console.error('加载数据失败:', error);
       setError('加载对话数据失败，请检查后端服务是否正常运行');
       // 如果API调用失败，显示空数据
       setConversations([]);
-      setStatistics({ total: 0, today: 0, averageMessages: 0, averageResponseTime: 0 });
+      setStatistics({ total: 0, today: 0, averageMessages: 0, averageResponseTime: 0, successRate: 0 });
     } finally {
       setIsLoading(false);
     }
@@ -102,8 +104,8 @@ export default function ConversationsPage() {
     try {
       const messagesResponse = await fetchMessages(conversationId, {
         page: 1,
-        page_size: 100,
-        sorts: [{ key: 'created_at', desc: false }],
+        page_size: 20,
+        sorts: [{ key: 'created_at', desc: true }],
       });
 
       // 使用新的响应数据结构
@@ -130,27 +132,6 @@ export default function ConversationsPage() {
   useEffect(() => {
     loadAgents();
   }, [loadAgents]);
-
-  const getResponseTimeBadge = (responseTime?: number) => {
-    if (!responseTime) return <Badge variant="outline">-</Badge>;
-    if (responseTime < 2)
-      return (
-        <Badge variant="default" className="bg-green-100 text-green-800">
-          快速
-        </Badge>
-      );
-    if (responseTime < 5)
-      return (
-        <Badge variant="default" className="bg-yellow-100 text-yellow-800">
-          正常
-        </Badge>
-      );
-    return (
-      <Badge variant="default" className="bg-red-100 text-red-800">
-        较慢
-      </Badge>
-    );
-  };
 
   const handleViewConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
@@ -235,7 +216,7 @@ export default function ConversationsPage() {
             <CheckCircle className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">98.5%</div>
+            <div className="text-2xl font-bold">{statistics.successRate.toFixed(1)}%</div>
             <p className="text-muted-foreground text-xs">无错误响应</p>
           </CardContent>
         </Card>
@@ -323,7 +304,6 @@ export default function ConversationsPage() {
                   <TableHead className="min-w-[100px]">用户</TableHead>
                   <TableHead className="min-w-[100px]">智能体</TableHead>
                   <TableHead className="min-w-[80px] text-center">消息数</TableHead>
-                  <TableHead className="min-w-[100px] text-center">响应时间</TableHead>
                   <TableHead className="hidden min-w-[140px] sm:table-cell">开始时间</TableHead>
                   <TableHead className="min-w-[120px] text-right">操作</TableHead>
                 </TableRow>
@@ -345,9 +325,6 @@ export default function ConversationsPage() {
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant="outline">{conversation.message_count}</Badge>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {getResponseTimeBadge(conversation.last_message?.response_time)}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       <div className="text-muted-foreground flex items-center gap-1 text-sm">
