@@ -148,6 +148,10 @@ class ChatMessage(BaseModel):
         description="Custom message data.",
         default={},
     )
+    usage_metadata: dict[str, Any] = Field(
+        description="Usage metadata.",
+        default={},
+    )
 
     def pretty_repr(self) -> str:
         """Get a pretty representation of the message."""
