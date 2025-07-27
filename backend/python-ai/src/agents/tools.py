@@ -2,10 +2,12 @@ import math
 import re
 
 import numexpr
-from langchain_core.tools import BaseTool, tool
-from langchain_openai import OpenAIEmbeddings
-from langchain_postgres import PGVector
 from core import settings
+# from langchain_openai import OpenAIEmbeddings
+from langchain_core.embeddings import get_embeddings_by_provider
+from langchain_core.tools import BaseTool, tool
+from langchain_postgres import PGVector
+
 
 def calculator_func(expression: str) -> str:
     """Calculates a math expression using numexpr.
@@ -59,13 +61,19 @@ def get_postgres_connection_string() -> str:
     return f"postgresql://{settings.POSTGRES_USER}:{password}@{settings.POSTGRES_HOST}:{port}/{settings.POSTGRES_DB}"
 
 
-def load_postgres_vectorstore(collection_name: str = "default_knowledge_base"):
+def load_postgres_vectorstore(collection_name: str = "default_knowledge_base", embeddings_config: dict = None):
     """加载PostgreSQL向量存储"""
     try:
-        embeddings = OpenAIEmbeddings()
+        if embeddings_config:
+            # 使用传入的配置
+            provider = embeddings_config.get("provider", "openai")
+            model = embeddings_config.get("model", "text-embedding-3-small")
+            config = embeddings_config.get("config", {})
+
+        embeddings = get_embeddings_by_provider(provider, model, tuple(sorted(config.items())))
     except Exception as e:
         raise RuntimeError(
-            "初始化OpenAIEmbeddings失败。请确保已设置OpenAI API密钥。"
+            "初始化Embeddings失败。请确保已设置相应的API密钥。"
         ) from e
 
     # 获取PostgreSQL连接字符串
@@ -83,15 +91,16 @@ def load_postgres_vectorstore(collection_name: str = "default_knowledge_base"):
     return retriever
 
 
-def database_search_func(query: str, knowledge_base: str = "default_knowledge_base") -> str:
+def database_search_func(query: str, knowledge_base: str = "default_knowledge_base", embeddings_config: dict = None) -> str:
     """在指定的知识库中搜索信息。
     
     Args:
         query: 搜索查询
         knowledge_base: 知识库名称，默认为"default_knowledge_base"
+        embeddings_config: embeddings配置，包含provider、model、config等
     """
     # 获取PostgreSQL检索器
-    retriever = load_postgres_vectorstore(collection_name=knowledge_base)
+    retriever = load_postgres_vectorstore(collection_name=knowledge_base, embeddings_config=embeddings_config)
 
     # 在数据库中搜索相关文档
     documents = retriever.invoke(query)
@@ -103,11 +112,11 @@ def database_search_func(query: str, knowledge_base: str = "default_knowledge_ba
 
 
 # 创建动态知识库搜索工具
-def create_database_search_tool(knowledge_base: str = "default_knowledge_base") -> BaseTool:
+def create_database_search_tool(knowledge_base: str = "default_knowledge_base", embeddings_config: dict = None) -> BaseTool:
     """创建针对特定知识库的搜索工具"""
     
     def search_func(query: str) -> str:
-        return database_search_func(query, knowledge_base)
+        return database_search_func(query, knowledge_base, embeddings_config)
     
     search_func.__name__ = f"database_search_{knowledge_base}"
     search_func.__doc__ = f"在{knowledge_base}知识库中搜索信息。"

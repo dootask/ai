@@ -23,7 +23,24 @@ class AgentState(MessagesState, total=False):
     remaining_steps: RemainingSteps
 
 
-tools = [database_search]
+# This wrapper allows us to pass the graph's config to the database_search tool.
+# The tool's implementation in `agents/tools.py` must be updated to accept a
+# `config: RunnableConfig` keyword argument in its function signature.
+async def _database_search_with_config(payload: dict, config: RunnableConfig):
+    """Injects config into the tool call."""
+    # We are assuming the tool's underlying function is async and accepts a 'config' kwarg.
+    return await database_search.func(config=config, **payload)
+
+
+# Create a new runnable tool that includes our wrapper.
+database_search_configured = RunnableLambda(_database_search_with_config)
+
+# Copy the original tool's metadata so the LLM can use it correctly.
+database_search_configured.name = database_search.name
+database_search_configured.description = database_search.description
+database_search_configured.args_schema = database_search.args_schema
+
+tools = [database_search_configured]
 
 
 current_date = datetime.now().strftime("%B %d, %Y")
