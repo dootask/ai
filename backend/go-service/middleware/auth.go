@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"dootask-ai/go-service/global"
-	"dootask-ai/go-service/pkg/utils"
+	"dootask-ai/go-service/utils"
 	"errors"
 	"net/http"
 	"slices"

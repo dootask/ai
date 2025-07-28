@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"dootask-ai/go-service/global"
-	"dootask-ai/go-service/pkg/utils"
+	"dootask-ai/go-service/utils"
 
 	"github.com/duke-git/lancet/v2/slice"
 	"github.com/gin-gonic/gin"
@@ -541,7 +541,7 @@ func calculateConversationStatistics(userID int64) ConversationStatistics {
 	}
 
 	// 计算平均响应时间
-	var averageResponseTime float64
+	var averageResponseTime sql.NullFloat64
 	global.DB.Raw(`
 		SELECT avg(m.response_time_ms) FROM agents a
 		LEFT JOIN conversations c ON a.id = c.agent_id
@@ -549,7 +549,7 @@ func calculateConversationStatistics(userID int64) ConversationStatistics {
 		WHERE a.user_id = ? AND m.status = 1 AND m.role = 'assistant'
 	`, global.DooTaskUser.UserID).Scan(&averageResponseTime)
 
-	stats.AverageResponseTime = averageResponseTime / 1000.0
+	stats.AverageResponseTime = averageResponseTime.Float64 / 1000.0
 
 	// 计算成功率 - 成功消息数 / 总消息数
 	var successCount, totalCount int64

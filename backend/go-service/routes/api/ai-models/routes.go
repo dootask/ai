@@ -2,7 +2,7 @@ package aimodels
 
 import (
 	"dootask-ai/go-service/global"
-	"dootask-ai/go-service/pkg/utils"
+	"dootask-ai/go-service/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"

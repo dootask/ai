@@ -34,7 +34,7 @@ type CreateAIModelRequest struct {
 	ModelName   string  `json:"model_name" validate:"required,min=1,max=255"`
 	ApiKey      *string `json:"api_key,omitempty"`
 	BaseURL     string  `json:"base_url" validate:"omitempty,url"`
-	ProxyURL    *string `json:"proxy_url,omitempty" validate:"omitempty,url"`
+	ProxyURL    *string `json:"proxy_url,omitempty" validate:"omitempty"`
 	MaxTokens   int     `json:"max_tokens" validate:"min=1"`
 	Temperature float32 `json:"temperature" validate:"min=0,max=2"`
 	IsEnabled   bool    `json:"is_enabled"`
@@ -48,7 +48,7 @@ type UpdateAIModelRequest struct {
 	ModelName   *string  `json:"model_name,omitempty" validate:"omitempty,min=1,max=255"`
 	ApiKey      *string  `json:"api_key,omitempty"`
 	BaseURL     *string  `json:"base_url,omitempty" validate:"omitempty,url"`
-	ProxyURL    *string  `json:"proxy_url,omitempty" validate:"omitempty,url"`
+	ProxyURL    *string  `json:"proxy_url,omitempty" validate:"omitempty"`
 	MaxTokens   *int     `json:"max_tokens,omitempty" validate:"omitempty,min=1"`
 	Temperature *float32 `json:"temperature,omitempty" validate:"omitempty,min=0,max=2"`
 	IsEnabled   *bool    `json:"is_enabled,omitempty"`

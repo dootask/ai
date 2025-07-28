@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"dootask-ai/go-service/global"
-	"dootask-ai/go-service/pkg/utils"
+	"dootask-ai/go-service/utils"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"

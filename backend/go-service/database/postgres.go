@@ -6,7 +6,7 @@ import (
 
 	"dootask-ai/go-service/global"
 	"dootask-ai/go-service/migrations"
-	"dootask-ai/go-service/pkg/utils"
+	"dootask-ai/go-service/utils"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

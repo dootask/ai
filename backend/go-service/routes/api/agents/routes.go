@@ -1,13 +1,14 @@
 package agents
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 
 	"dootask-ai/go-service/global"
-	"dootask-ai/go-service/pkg/utils"
+	"dootask-ai/go-service/utils"
 
 	dootask "github.com/dootask/tools/server/go"
 	"github.com/gin-gonic/gin"
@@ -136,7 +137,7 @@ func ListAgents(c *gin.Context) {
 		return
 	}
 
-	var averageResponseTime float64
+	var averageResponseTime sql.NullFloat64
 	global.DB.Raw(`
 		SELECT avg(m.response_time_ms) FROM agents a
 		LEFT JOIN conversations c ON a.id = c.agent_id
@@ -149,7 +150,7 @@ func ListAgents(c *gin.Context) {
 
 		agent.Statistics = &AgentStatistics{
 			TotalMessages:       int64(len(agent.Conversations)),
-			AverageResponseTime: averageResponseTime,
+			AverageResponseTime: averageResponseTime.Float64,
 		}
 		agents[i] = agent
 	}

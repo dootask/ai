@@ -1,7 +1,7 @@
 package global
 
 import (
-	"dootask-ai/go-service/pkg/utils"
+	"dootask-ai/go-service/utils"
 
 	dootask "github.com/dootask/tools/server/go"
 	"github.com/go-playground/validator/v10"

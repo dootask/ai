@@ -190,8 +190,10 @@ func TestDashboard(c *gin.Context) {
 func getAgentStats() AgentStats {
 	var stats AgentStats
 
-	global.DB.Table("agents").Count(&stats.Total)
-	global.DB.Table("agents").Where("is_active = true").Count(&stats.Active)
+	userID := global.DooTaskUser.UserID
+
+	global.DB.Table("agents").Where("user_id = ?", userID).Count(&stats.Total)
+	global.DB.Table("agents").Where("user_id = ? AND is_active = true", userID).Count(&stats.Active)
 	stats.Inactive = stats.Total - stats.Active
 
 	return stats
@@ -201,48 +203,68 @@ func getAgentStats() AgentStats {
 func getConversationStats() ConversationStats {
 	var stats ConversationStats
 
-	global.DB.Table("conversations").Count(&stats.Total)
-	global.DB.Table("conversations").Where("is_active = true").Count(&stats.Active)
+	userID := convertor.ToString(global.DooTaskUser.UserID)
+
+	global.DB.Table("conversations").Where("dootask_user_id = ?", userID).Count(&stats.Total)
+	global.DB.Table("conversations").Where("dootask_user_id = ? AND is_active = true", userID).Count(&stats.Active)
 
 	// 今日对话数
 	today := time.Now().Truncate(24 * time.Hour)
-	global.DB.Table("conversations").Where("created_at >= ?", today).Count(&stats.Today)
+	global.DB.Table("conversations").Where("created_at >= ? AND dootask_user_id = ?", today, userID).Count(&stats.Today)
 
 	return stats
 }
 
 // getMessageStats 获取消息统计
 func getMessageStats() MessageStats {
+	userID := convertor.ToString(global.DooTaskUser.UserID)
+
 	var stats MessageStats
 
-	global.DB.Table("messages").Count(&stats.Total)
+	global.DB.Table("messages").Joins(
+		"LEFT JOIN conversations c ON messages.conversation_id = c.id",
+	).Where("c.dootask_user_id = ?", userID).Count(&stats.Total)
 
 	// 今日消息数
 	today := time.Now().Truncate(24 * time.Hour)
-	global.DB.Table("messages").Where("created_at >= ?", today).Count(&stats.Today)
+	global.DB.Table("messages").Joins(
+		"LEFT JOIN conversations c ON messages.conversation_id = c.id",
+	).Where("c.dootask_user_id = ? AND messages.created_at >= ?", userID, today).Count(&stats.Today)
 
-	// 模拟平均响应时间
-	stats.AverageResponseTime = 2.1
+	// 计算平均响应时间
+	var averageResponseTime sql.NullFloat64
+	global.DB.Raw(`
+		SELECT avg(m.response_time_ms) FROM agents a
+		LEFT JOIN conversations c ON a.id = c.agent_id
+		LEFT JOIN messages m ON c.id= m.conversation_id
+		WHERE a.user_id = ? AND m.status = 1 AND m.role = 'assistant'
+	`, userID).Scan(&averageResponseTime)
+
+	stats.AverageResponseTime = averageResponseTime.Float64 / 1000.0
 
 	return stats
 }
 
 // getKnowledgeBaseStats 获取知识库统计
 func getKnowledgeBaseStats() KnowledgeBaseStats {
+	userID := global.DooTaskUser.UserID
+
 	var stats KnowledgeBaseStats
 
-	global.DB.Table("knowledge_bases").Count(&stats.Total)
-	global.DB.Table("kb_documents").Count(&stats.DocumentsCount)
+	global.DB.Table("knowledge_bases").Where("user_id = ?", userID).Count(&stats.Total)
+	global.DB.Table("kb_documents").Joins("LEFT JOIN knowledge_bases kb ON kb_documents.knowledge_base_id = kb.id").Where("kb.user_id = ?", userID).Count(&stats.DocumentsCount)
 
 	return stats
 }
 
 // getMCPToolStats 获取MCP工具统计
 func getMCPToolStats() MCPToolStats {
+	userID := global.DooTaskUser.UserID
+
 	var stats MCPToolStats
 
-	global.DB.Table("mcp_tools").Count(&stats.Total)
-	global.DB.Table("mcp_tools").Where("is_active = true").Count(&stats.Active)
+	global.DB.Table("mcp_tools").Where("user_id = ?", userID).Count(&stats.Total)
+	global.DB.Table("mcp_tools").Where("user_id = ? AND is_active = true", userID).Count(&stats.Active)
 
 	return stats
 }

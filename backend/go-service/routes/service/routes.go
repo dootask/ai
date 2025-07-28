@@ -3,10 +3,10 @@ package service
 import (
 	"context"
 	"dootask-ai/go-service/global"
-	"dootask-ai/go-service/pkg/utils"
 	"dootask-ai/go-service/routes/api/agents"
 	aimodels "dootask-ai/go-service/routes/api/ai-models"
 	"dootask-ai/go-service/routes/api/conversations"
+	"dootask-ai/go-service/utils"
 	"encoding/json"
 	"errors"
 	"fmt"
