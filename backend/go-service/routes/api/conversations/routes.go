@@ -399,12 +399,6 @@ func GetMessages(c *gin.Context) {
 		return
 	}
 
-	// 设置默认排序（消息默认升序排列）
-	req.SetDefaultSorts(map[string]bool{
-		"created_at": false,
-		"id":         false,
-	})
-
 	// 验证参数
 	validate := validator.New()
 	if err := validate.Struct(&req); err != nil {
@@ -493,14 +487,6 @@ func GetMessages(c *gin.Context) {
 			"data":    nil,
 		})
 		return
-	}
-
-	// 为assistant消息添加模拟响应时间
-	for i := range messages {
-		if messages[i].Role == "assistant" {
-			responseTime := 2.1
-			messages[i].ResponseTime = &responseTime
-		}
 	}
 
 	// 构造响应数据

@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
+import MessageContent from '@/components/message-content';
 import { useDebounceCallback } from '@/hooks/use-debounce';
 import { agentsApi } from '@/lib/api/agents';
 import { fetchConversations, fetchMessages } from '@/lib/api/conversations';
@@ -378,6 +379,11 @@ export default function ConversationsPage() {
                                 {/* 消息记录 */}
                                 <div className="space-y-3">
                                   <h4 className="font-medium">消息记录</h4>
+                                  {selectedConversation.message_count > 20 && (
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                      <span className="text-muted-foreground text-sm">仅显示最新20条记录</span>
+                                    </div>
+                                  )}
                                   {conversationMessages.map(message => (
                                     <div
                                       key={message.id}
@@ -408,7 +414,7 @@ export default function ConversationsPage() {
                                           </Badge>
                                         )}
                                       </div>
-                                      <div className="text-sm whitespace-pre-wrap">{message.content}</div>
+                                      <MessageContent content={message.content} messageRole={message.role} />
                                     </div>
                                   ))}
                                 </div>

@@ -144,7 +144,7 @@ func (h *Handler) Webhook(c *gin.Context) {
 		ConversationID: conversation.ID,
 		SendID:         req.SendId,
 		Role:           "user",
-		Content:        req.Text,
+		Content:        h.buildUserMessage(req),
 	}
 	if err := global.DB.Create(&message).Error; err != nil {
 		fmt.Println("创建消息失败:", err)
@@ -321,13 +321,14 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		"base_url":    aiModel.BaseURL,
 		"credentials": "",
 		"proxy_url":   aiModel.ProxyURL,
+		"prompt":      agent.Prompt,
 		"spicy_level": 0,
 		"temperature": aiModel.Temperature,
 	}
 
 	// 发送POST请求获取流式响应
 	data := map[string]any{
-		"message":       req.Text,
+		"message":       h.buildUserMessage(req),
 		"provider":      aiModel.Provider,
 		"model":         aiModel.ModelName,
 		"thread_id":     fmt.Sprintf("%d_%d", req.DialogId, req.SessionId),
@@ -336,10 +337,27 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		"stream_tokens": true,
 	}
 
+	fmt.Printf("AI请求数据: %+v\n", data)
+
 	resp, err := httpClient.Stream(context.Background(), "/stream", nil, nil, http.MethodPost, data, "application/json")
 	if err != nil {
 		return nil, errors.New("请求AI失败")
 	}
 
 	return resp, nil
+}
+
+// 构建用户消息
+func (h *Handler) buildUserMessage(req WebhookRequest) string {
+	text := req.Text
+	if req.ReplyText != "" {
+		text = fmt.Sprintf(
+			`<quoted_content>
+%s
+</quoted_content>
+
+%s`, req.ReplyText, req.Text)
+	}
+
+	return text
 }
