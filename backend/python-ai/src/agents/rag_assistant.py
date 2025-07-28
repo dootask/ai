@@ -32,16 +32,16 @@ async def _database_search_with_config(payload: dict, config: RunnableConfig):
     return await database_search.func(config=config, **payload)
 
 
-# Create a new runnable tool that includes our wrapper.
+# # Create a new runnable tool that includes our wrapper.
 database_search_configured = RunnableLambda(_database_search_with_config)
 
-# Copy the original tool's metadata so the LLM can use it correctly.
+# # Copy the original tool's metadata so the LLM can use it correctly.
 database_search_configured.name = database_search.name
 database_search_configured.description = database_search.description
 database_search_configured.args_schema = database_search.args_schema
 
 tools = [database_search_configured]
-
+# tools=[database_search]
 
 current_date = datetime.now().strftime("%B %d, %Y")
 instructions = f"""

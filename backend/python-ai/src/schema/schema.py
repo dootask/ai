@@ -89,12 +89,13 @@ class UserInput(BaseModel):
         default={},
         examples=[
             {
-                "spicy_level": 0.8,
                 "api_key": "xxxx",
                 "base_url": "https://example.com",
                 "api_version": "azure的model版本号",
                 "proxy_url": "http://proxy.com",
                 "temperature": 0.7,
+                "max_token": None,
+                "prompt": "你是一个聊天助手"
             }
         ],
     )
