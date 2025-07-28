@@ -62,3 +62,37 @@ type StreamErrorData struct {
 		Message string
 	}
 }
+
+// DooTaskMessage DooTask消息结构
+type DooTaskMessage struct {
+	Type string                `json:"Type"`
+	Msg  DooTaskMessageContent `json:"Msg"`
+}
+
+// DooTaskMessageContent 消息内容
+type DooTaskMessageContent struct {
+	Text string `json:"Text"`
+}
+
+// DooTaskMessageList 消息列表响应
+type DooTaskMessageList struct {
+	List []DooTaskMessage `json:"List"`
+}
+
+// MessageExtractor 消息提取器接口
+type MessageExtractor interface {
+	ExtractText() string
+	IsTextMessage() bool
+}
+
+// 实现 MessageExtractor 接口
+func (m DooTaskMessage) ExtractText() string {
+	if m.Type == "text" {
+		return m.Msg.Text
+	}
+	return ""
+}
+
+func (m DooTaskMessage) IsTextMessage() bool {
+	return m.Type == "text"
+}

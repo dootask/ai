@@ -326,18 +326,21 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		"temperature": aiModel.Temperature,
 	}
 
+	threadId := fmt.Sprintf("%d_%d", req.DialogId, req.SessionId)
+	if req.DialogType == "group" {
+		threadId = ""
+	}
+
 	// 发送POST请求获取流式响应
 	data := map[string]any{
 		"message":       h.buildUserMessage(req),
 		"provider":      aiModel.Provider,
 		"model":         aiModel.ModelName,
-		"thread_id":     fmt.Sprintf("%d_%d", req.DialogId, req.SessionId),
+		"thread_id":     threadId,
 		"user_id":       strconv.Itoa(int(agent.UserID)),
 		"agent_config":  agentConfig,
 		"stream_tokens": true,
 	}
-
-	fmt.Printf("AI请求数据: %+v\n", data)
 
 	resp, err := httpClient.Stream(context.Background(), "/stream", nil, nil, http.MethodPost, data, "application/json")
 	if err != nil {
@@ -349,15 +352,67 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 
 // 构建用户消息
 func (h *Handler) buildUserMessage(req WebhookRequest) string {
-	text := req.Text
+	text := ""
+	if req.DialogType == "group" {
+		messageList, err := global.DooTaskClient.Client.GetMessageList(dootask.GetMessageListRequest{
+			DialogID: int(req.DialogId),
+			Take:     10,
+		})
+		if err != nil {
+			fmt.Println("获取消息列表失败:", err)
+		}
+
+		// 使用辅助函数提取文本消息
+		text = extractTextFromMessages(messageList)
+	}
+
+	text += req.Text
 	if req.ReplyText != "" {
 		text = fmt.Sprintf(
 			`<quoted_content>
 %s
 </quoted_content>
 
-%s`, req.ReplyText, req.Text)
+%s`, req.ReplyText, text)
 	}
 
 	return text
+}
+
+// parseMessageFromAny 将any类型安全地转换为DooTaskMessage
+func parseMessageFromAny(message any) (*DooTaskMessage, error) {
+	messageBytes, err := json.Marshal(message)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal message: %w", err)
+	}
+
+	var dooTaskMsg DooTaskMessage
+	if err := json.Unmarshal(messageBytes, &dooTaskMsg); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal to DooTaskMessage: %w", err)
+	}
+
+	return &dooTaskMsg, nil
+}
+
+// extractTextFromMessages 从消息列表中提取所有文本内容
+func extractTextFromMessages(messageList any) string {
+	var text strings.Builder
+
+	// 尝试解析为包含List字段的结构
+	if messageBytes, err := json.Marshal(messageList); err == nil {
+		var listContainer struct {
+			List []any `json:"List"`
+		}
+		if err := json.Unmarshal(messageBytes, &listContainer); err == nil {
+			for _, message := range listContainer.List {
+				if dooTaskMsg, err := parseMessageFromAny(message); err == nil {
+					if dooTaskMsg.IsTextMessage() {
+						text.WriteString(fmt.Sprintf("%s\n\n", dooTaskMsg.ExtractText()))
+					}
+				}
+			}
+		}
+	}
+
+	return text.String()
 }
