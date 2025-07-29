@@ -153,9 +153,9 @@ async def prepare_augmented_prompt(
 async def acall_model(state: AgentState, config: RunnableConfig) -> AgentState:
     """Generate a response based on the retrieved documents."""
     m = get_model_by_provider(
-        config["configurable"].get("provider"),
-        config["configurable"].get("model", settings.DEFAULT_MODEL),
-        config["configurable"].get("agent_config", None),
+        config.get("configurable",{}).get("provider"),
+        config.get("configurable",{}).get("model", settings.DEFAULT_MODEL),
+        config.get("configurable",{}).get("agent_config", None),
     )
     model_runnable = wrap_model(m)
 

@@ -51,6 +51,7 @@ PROVIDER_MODEL_MAPPING = {
             "api_key": "api_key",
             "temperature": "temperature",
             "openai_proxy": "openai_proxy",
+            "max_tokens": "max_tokens",
         }
     },
     "anthropic": {
@@ -63,6 +64,7 @@ PROVIDER_MODEL_MAPPING = {
             "model": "model",
             "api_key": "api_key",
             "temperature": "temperature",
+            "max_tokens": "max_tokens",
         }
     },
     "google": {
@@ -75,6 +77,7 @@ PROVIDER_MODEL_MAPPING = {
             "model": "model",
             "api_key": "api_key",
             "temperature": "temperature",
+            "max_tokens": "max_tokens",
         }
     },
     "xai": {
@@ -86,6 +89,7 @@ PROVIDER_MODEL_MAPPING = {
             "api_key": "api_key",
             "openai_proxy": "openai_proxy",
             "temperature": "temperature",
+            "max_tokens": "max_tokens",
         }
     },
     "deepseek": {
@@ -99,6 +103,7 @@ PROVIDER_MODEL_MAPPING = {
             "api_key": "api_key",
             "openai_proxy": "openai_proxy",
             "temperature": "temperature",
+            "max_tokens": "max_tokens",
         }
     },
     "azure": {
@@ -116,6 +121,7 @@ PROVIDER_MODEL_MAPPING = {
             "api_version": "api_version",
             "temperature": "temperature",
             "openai_proxy": "openai_proxy",
+            "max_tokens": "max_tokens",
         },
         "default_values": {
             "api_version": "2024-02-15-preview"
@@ -129,7 +135,8 @@ PROVIDER_MODEL_MAPPING = {
             "model": "model",
             "temperature": "temperature",
             "base_url": "base_url",
-            "api_key": "api_key"
+            "api_key": "api_key",
+            "max_tokens": "max_tokens",
         }
     },
     # OpenAI 兼容的提供商
@@ -145,6 +152,7 @@ PROVIDER_MODEL_MAPPING = {
             "api_key": "api_key",
             "temperature": "temperature",
             "openai_proxy": "openai_proxy",
+            "max_tokens": "max_tokens",
         }
     },
     "alibaba": {
@@ -159,6 +167,7 @@ PROVIDER_MODEL_MAPPING = {
             "api_key": "api_key",
             "temperature": "temperature",
             "openai_proxy": "openai_proxy",
+            "max_tokens": "max_tokens",
         }
     },
     "cohere": {
@@ -171,7 +180,8 @@ PROVIDER_MODEL_MAPPING = {
             "model": "model",
             "base_url": "base_url",
             "cohere_api_key": "api_key",
-            "temperature": "temperature"
+            "temperature": "temperature",
+            "max_tokens": "max_tokens",
         }
     },
     "openrouter": {
@@ -186,6 +196,7 @@ PROVIDER_MODEL_MAPPING = {
             "api_key": "api_key",
             "temperature": "temperature",
             "openai_proxy": "openai_proxy",
+            "max_tokens": "max_tokens",
         }
     },
 }
@@ -194,7 +205,7 @@ PROVIDER_MODEL_MAPPING = {
 def get_model_by_provider(
     provider_name: str, 
     model_name: str, 
-    config_tuple: Optional[dict] = None
+    config_tuple: dict | None
 ) -> ModelT:
     """
     根据提供商名称直接返回对应的模型实例

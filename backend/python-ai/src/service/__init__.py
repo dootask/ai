@@ -1,3 +1,3 @@
-from service.service import app
+from service.document_service import DocumentService
 
-__all__ = ["app"]
+__all__ = ["DocumentService"]

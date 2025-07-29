@@ -34,6 +34,28 @@ class ServiceMetadata(BaseModel):
         description="Default model used when none is specified.",
     )
 
+class DocumentInput(BaseModel):
+    """Input for document processing."""
+
+    knowledge_base: str = Field(
+        description="Knowledge base to store the processed documents.",
+        examples=["default_knowledge_base"],
+    )
+    provider: str = Field(
+        description="Provider of the embedding model.",
+        default="openai",
+        examples=["openai", "cohere", "google"],
+    )
+    model: str = Field(
+        description="Embedding model to use.",
+        default="text-embedding-3-small",
+        examples=["text-embedding-3-small", "text-embedding-ada-002"],
+    )
+    api_key: str | None = Field(
+        description="API key for the embedding provider (if required).",
+        default=None,
+        examples=["sk-xxxxxx"],
+    )
 
 class UserInput(BaseModel):
     """Basic user input for the agent."""
@@ -44,7 +66,7 @@ class UserInput(BaseModel):
     )
     provider: str | None = Field(
         description="Provider of the user input.",
-        examples=["OpenAI", "Anthropic", "Google", "xAI (Grok)"],
+        examples=["openai", "anthropic", "google", "xai"],
     )
     model: SerializeAsAny[str] | None = Field(
         title="Model",
@@ -67,12 +89,13 @@ class UserInput(BaseModel):
         default={},
         examples=[
             {
-                "spicy_level": 0.8,
                 "api_key": "xxxx",
                 "base_url": "https://example.com",
                 "api_version": "azure的model版本号",
                 "proxy_url": "http://proxy.com",
                 "temperature": 0.7,
+                "max_token": None,
+                "prompt": "你是一个聊天助手",
             }
         ],
     )
@@ -92,6 +115,19 @@ class UserInput(BaseModel):
                 },
             }
         ],
+    )
+    rag_config: dict[str, Any] = Field(
+        description = "rag agent request parameters",
+        default={},
+        examples=[
+            {
+                "knowledge_base": ["default_knowledge_base","devops_doc"],
+                "provider": "openai",
+                "model": "text-embedding-3-small",
+                "api_key": "xxxxxxx",
+                "proxy_url": "http://proxy.com"
+            }
+        ]
     )
 
 class StreamInput(UserInput):
@@ -148,6 +184,10 @@ class ChatMessage(BaseModel):
         description="Custom message data.",
         default={},
     )
+    usage_metadata: dict[str, Any] = Field(
+        description="Usage metadata for the message.",
+        default={},
+    )
 
     def pretty_repr(self) -> str:
         """Get a pretty representation of the message."""
@@ -189,6 +229,27 @@ class FeedbackResponse(BaseModel):
     status: Literal["success"] = "success"
 
 
+class ServiceMetadata(BaseModel):
+    """服务元数据，包括名称、版本等信息"""
+    
+    name: str = Field(
+        description="服务名称",
+        examples=["AI 助手服务"]
+    )
+    version: str = Field(
+        description="服务版本",
+        examples=["1.0.0"]
+    )
+    description: str = Field(
+        description="服务描述",
+        examples=["基于 LangGraph 的智能助手服务"]
+    )
+    available_agents: list[str] = Field(
+        description="可用的代理列表",
+        default=[]
+    )
+
+
 class ChatHistoryInput(BaseModel):
     """Input for retrieving chat history."""
 
@@ -200,3 +261,22 @@ class ChatHistoryInput(BaseModel):
 
 class ChatHistory(BaseModel):
     messages: list[ChatMessage]
+
+
+class KnowledgeBaseResponse(BaseModel):
+    """知识库响应模型"""
+    knowledge_bases: list[str]
+
+
+class UploadResponse(BaseModel):
+    """文档上传响应模型"""
+    knowledge_base: str
+    total_files: int
+    total_chunks: int
+    processed_files: list[dict[str, Any]]
+
+
+class DeleteResponse(BaseModel):
+    """删除响应模型"""
+    knowledge_base: str
+    status: str

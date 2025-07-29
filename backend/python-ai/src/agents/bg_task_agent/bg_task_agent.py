@@ -27,9 +27,9 @@ def wrap_model(model: BaseChatModel) -> RunnableSerializable[AgentState, AIMessa
 
 async def acall_model(state: AgentState, config: RunnableConfig) -> AgentState:
     m = get_model_by_provider(
-        config["configurable"].get("provider"),
-        config["configurable"].get("model", settings.DEFAULT_MODEL),
-        config["configurable"].get("agent_config", None),
+        config.get("configurable",{}).get("provider"),
+        config.get("configurable",{}).get("model", settings.DEFAULT_MODEL),
+        config.get("configurable",{}).get("agent_config", None),
     )
     model_runnable = wrap_model(m)
     response = await model_runnable.ainvoke(state, config)

@@ -1,5 +1,3 @@
-from typing import List
-
 from core import get_model_by_provider, settings
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.runnables import RunnableConfig
@@ -63,9 +61,9 @@ def build_supervisor(provider: str,model_name: str):
 
 @entrypoint()
 async def supervisor_agent(
-    inputs: dict[str, List[BaseMessage]],
+    inputs: dict[str, list[BaseMessage]],
     *,
-    previous: dict[str, List[BaseMessage]],
+    previous: dict[str, list[BaseMessage]],
     config: RunnableConfig,
 ):
     # 1. 合并历史消息
@@ -74,11 +72,11 @@ async def supervisor_agent(
         messages = previous["messages"] + messages
 
     # 2. 动态决定模型并构建 supervisor
-    model_name = config["configurable"].get("model", settings.DEFAULT_MODEL)
+    model_name = config.get("configurable",{}).get("model", settings.DEFAULT_MODEL)
     supervisor = build_supervisor(
-        config["configurable"].get("provider"),
+        config.get("configurable",{}).get("provider"),
         model_name,
-        config["configurable"].get("agent_config", None),
+        config.get("configurable",{}).get("agent_config", None),
     )
 
     # 3. 运行 supervisor

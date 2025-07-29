@@ -1,13 +1,6 @@
-from langchain_core.messages import (
-    AIMessage,
-    BaseMessage,
-    HumanMessage,
-    ToolMessage,
-)
-from langchain_core.messages import (
-    ChatMessage as LangchainChatMessage,
-)
-
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import ChatMessage as LangchainChatMessage
+from langchain_core.messages import HumanMessage, ToolMessage
 from schema import ChatMessage
 
 
@@ -42,6 +35,8 @@ def langchain_to_chat_message(message: BaseMessage) -> ChatMessage:
                 ai_message.tool_calls = message.tool_calls
             if message.response_metadata:
                 ai_message.response_metadata = message.response_metadata
+            if message.usage_metadata:
+                ai_message.usage_metadata = message.usage_metadata
             return ai_message
         case ToolMessage():
             tool_message = ChatMessage(
