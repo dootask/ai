@@ -168,7 +168,9 @@ func convertValueByType(value string, targetType reflect.Type) interface{} {
 		elemType := targetType.Elem()
 		elemValue := convertValueByType(value, elemType)
 		ptrValue := reflect.New(elemType)
-		ptrValue.Elem().Set(reflect.ValueOf(elemValue))
+		if elemValue != nil {
+			ptrValue.Elem().Set(reflect.ValueOf(elemValue).Convert(elemType))
+		}
 		return ptrValue.Interface()
 	}
 
