@@ -23,24 +23,7 @@ class AgentState(MessagesState, total=False):
     remaining_steps: RemainingSteps
 
 
-# This wrapper allows us to pass the graph's config to the database_search tool.
-# The tool's implementation in `agents/tools.py` must be updated to accept a
-# `config: RunnableConfig` keyword argument in its function signature.
-async def _database_search_with_config(payload: dict, config: RunnableConfig):
-    """Injects config into the tool call."""
-    # We are assuming the tool's underlying function is async and accepts a 'config' kwarg.
-    return await database_search.func(config=config, **payload)
-
-
-# # Create a new runnable tool that includes our wrapper.
-database_search_configured = RunnableLambda(_database_search_with_config)
-
-# # Copy the original tool's metadata so the LLM can use it correctly.
-database_search_configured.name = database_search.name
-database_search_configured.description = database_search.description
-database_search_configured.args_schema = database_search.args_schema
-
-tools = [database_search_configured]
+tools = [database_search]
 # tools=[database_search]
 
 current_date = datetime.now().strftime("%B %d, %Y")
@@ -60,8 +43,10 @@ instructions = f"""
     """
 
 
-def wrap_model(model: BaseChatModel) -> RunnableSerializable[AgentState, AIMessage]:
+def wrap_model(model: BaseChatModel, prompt: str, /) -> RunnableSerializable[AgentState, AIMessage]:
     bound_model = model.bind_tools(tools)
+    if prompt:
+        instructions = prompt
     preprocessor = RunnableLambda(
         lambda state: [SystemMessage(content=instructions)] + state["messages"],
         name="StateModifier",
@@ -75,22 +60,24 @@ def format_safety_message(safety: LlamaGuardOutput) -> AIMessage:
 
 
 async def acall_model(state: AgentState, config: RunnableConfig) -> AgentState:
+    configurable = config.get("configurable",{})
     m = get_model_by_provider(
-        config.get("configurable",{}).get("provider"),
-        config.get("configurable",{}).get("model", settings.DEFAULT_MODEL),
-        config.get("configurable",{}).get("agent_config", None),
+        configurable.get("provider"),
+        configurable.get("model", settings.DEFAULT_MODEL),
+        configurable.get("agent_config", None),
     )
-    model_runnable = wrap_model(m)
+    agent_config = dict(configurable.get("agent_config", None)) if configurable.get("agent_config", None) else {}
+    model_runnable = wrap_model(m,agent_config.get("prompt"))
     response = await model_runnable.ainvoke(state, config)
 
     # Run llama guard check here to avoid returning the message if it's unsafe
-    llama_guard = LlamaGuard()
-    safety_output = await llama_guard.ainvoke("Agent", state["messages"] + [response])
-    if safety_output.safety_assessment == SafetyAssessment.UNSAFE:
-        return {
-            "messages": [format_safety_message(safety_output)],
-            "safety": safety_output,
-        }
+    # llama_guard = LlamaGuard()
+    # safety_output = await llama_guard.ainvoke("Agent", state["messages"] + [response])
+    # if safety_output.safety_assessment == SafetyAssessment.UNSAFE:
+    #     return {
+    #         "messages": [format_safety_message(safety_output)],
+    #         "safety": safety_output,
+    #     }
 
     if state["remaining_steps"] < 2 and response.tool_calls:
         return {
@@ -120,28 +107,29 @@ async def block_unsafe_content(state: AgentState, config: RunnableConfig) -> Age
 agent = StateGraph(AgentState)
 agent.add_node("model", acall_model)
 agent.add_node("tools", ToolNode(tools))
-agent.add_node("guard_input", llama_guard_input)
-agent.add_node("block_unsafe_content", block_unsafe_content)
-agent.set_entry_point("guard_input")
+# agent.add_node("guard_input", llama_guard_input)
+# agent.add_node("block_unsafe_content", block_unsafe_content)
+# agent.set_entry_point("guard_input")
 
 
-# Check for unsafe input and block further processing if found
-def check_safety(state: AgentState) -> Literal["unsafe", "safe"]:
-    safety: LlamaGuardOutput = state["safety"]
-    match safety.safety_assessment:
-        case SafetyAssessment.UNSAFE:
-            return "unsafe"
-        case _:
-            return "safe"
+# # Check for unsafe input and block further processing if found
+# def check_safety(state: AgentState) -> Literal["unsafe", "safe"]:
+#     safety: LlamaGuardOutput = state["safety"]
+#     match safety.safety_assessment:
+#         case SafetyAssessment.UNSAFE:
+#             return "unsafe"
+#         case _:
+#             return "safe"
 
 
-agent.add_conditional_edges(
-    "guard_input", check_safety, {"unsafe": "block_unsafe_content", "safe": "model"}
-)
+# agent.add_conditional_edges(
+#     "guard_input", check_safety, {"unsafe": "block_unsafe_content", "safe": "model"}
+# )
 
-# Always END after blocking unsafe content
-agent.add_edge("block_unsafe_content", END)
+# # Always END after blocking unsafe content
+# agent.add_edge("block_unsafe_content", END)
 
+agent.set_entry_point("model")
 # Always run "model" after "tools"
 agent.add_edge("tools", "model")
 

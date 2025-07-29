@@ -66,7 +66,7 @@ class UserInput(BaseModel):
     )
     provider: str | None = Field(
         description="Provider of the user input.",
-        examples=["OpenAI", "Anthropic", "Google", "xAI (Grok)"],
+        examples=["openai", "anthropic", "google", "xai"],
     )
     model: SerializeAsAny[str] | None = Field(
         title="Model",
@@ -95,7 +95,7 @@ class UserInput(BaseModel):
                 "proxy_url": "http://proxy.com",
                 "temperature": 0.7,
                 "max_token": None,
-                "prompt": "你是一个聊天助手"
+                "prompt": "你是一个聊天助手",
             }
         ],
     )
@@ -115,6 +115,19 @@ class UserInput(BaseModel):
                 },
             }
         ],
+    )
+    rag_config: dict[str, Any] = Field(
+        description = "rag agent request parameters",
+        default={},
+        examples=[
+            {
+                "knowledge_base": ["default_knowledge_base","devops_doc"],
+                "provider": "openai",
+                "model": "text-embedding-3-small",
+                "api_key": "xxxxxxx",
+                "proxy_url": "http://proxy.com"
+            }
+        ]
     )
 
 class StreamInput(UserInput):
@@ -248,3 +261,22 @@ class ChatHistoryInput(BaseModel):
 
 class ChatHistory(BaseModel):
     messages: list[ChatMessage]
+
+
+class KnowledgeBaseResponse(BaseModel):
+    """知识库响应模型"""
+    knowledge_bases: list[str]
+
+
+class UploadResponse(BaseModel):
+    """文档上传响应模型"""
+    knowledge_base: str
+    total_files: int
+    total_chunks: int
+    processed_files: list[dict[str, Any]]
+
+
+class DeleteResponse(BaseModel):
+    """删除响应模型"""
+    knowledge_base: str
+    status: str

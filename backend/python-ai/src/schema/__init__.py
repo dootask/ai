@@ -1,7 +1,8 @@
 
 from schema.schema import (AgentInfo, ChatHistory, ChatHistoryInput,
                            ChatMessage, Feedback, FeedbackResponse,
-                           ServiceMetadata, StreamInput, UserInput, DocumentInput)
+                           ServiceMetadata, StreamInput, UserInput, DocumentInput,
+                           KnowledgeBaseResponse,UploadResponse,DeleteResponse)
 
 __all__ = [
     "AgentInfo",
@@ -13,5 +14,8 @@ __all__ = [
     "FeedbackResponse",
     "ChatHistoryInput",
     "ChatHistory",
-    "DocumentInput"
+    "DocumentInput",
+    "KnowledgeBaseResponse",
+    "UploadResponse",
+    "DeleteResponse"
 ]

@@ -65,7 +65,7 @@ class Settings(BaseSettings):
 
     LANGFUSE_TRACING: bool = False
     LANGFUSE_HOST: Annotated[str, BeforeValidator(check_str_is_http)] = (
-        "https://cloud.langfuse.com"
+        "https://us.cloud.langfuse.com"
     )
     LANGFUSE_PUBLIC_KEY: SecretStr | None = None
     LANGFUSE_SECRET_KEY: SecretStr | None = None
@@ -101,6 +101,7 @@ class Settings(BaseSettings):
     AZURE_OPENAI_DEPLOYMENT_MAP: dict[str, str] = Field(
         default_factory=dict, description="Map of model names to Azure deployment IDs"
     )
+    COLLECTION_NAME: str | None = "dootask_ai"
 
     @computed_field  # type: ignore[prop-decorator]
     @property

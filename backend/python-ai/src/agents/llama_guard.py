@@ -4,7 +4,7 @@ from core import get_model_by_provider, settings
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage
 from langchain_core.prompts import PromptTemplate
 from pydantic import BaseModel, Field
-
+from langchain_core.runnables import RunnableConfig
 
 class SafetyAssessment(Enum):
     SAFE = "safe"
@@ -74,7 +74,7 @@ def parse_llama_guard_output(output: str) -> LlamaGuardOutput:
 
 
 class LlamaGuard:
-    def __init__(self) -> None:
+    def __init__(self,*,config: RunnableConfig | None = None) -> None:
         if settings.GROQ_API_KEY is None:
             print("GROQ_API_KEY not set, skipping LlamaGuard")
             self.model = None

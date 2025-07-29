@@ -33,7 +33,7 @@ agents: dict[str, Agent] = {
     #     description="A research assistant with web search and calculator.",
     #     graph=research_assistant,
     # ),
-    "rag-assistant": Agent(
+    "rag-agent": Agent(
         description="A RAG assistant with access to information in a database.",
         graph=rag_assistant,
     ),

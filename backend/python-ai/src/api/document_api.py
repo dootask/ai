@@ -1,31 +1,14 @@
-from typing import Any, Optional
+import logging
 
 from api import verify_bearer
-from fastapi import (APIRouter, Depends, File, Form, HTTPException, Query,
+from fastapi import (APIRouter, Depends, File, Form, HTTPException, Query, Request,
                      UploadFile)
-from pydantic import BaseModel
-from schema import DocumentInput
-from service.document_service import document_service
+from service.document_service import DocumentService
+from schema import UploadResponse, KnowledgeBaseResponse, DeleteResponse
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", dependencies=[Depends(verify_bearer)],tags=["documents"])
 
-class KnowledgeBaseResponse(BaseModel):
-    """知识库响应模型"""
-    knowledge_bases: list[str]
-
-
-class UploadResponse(BaseModel):
-    """文档上传响应模型"""
-    knowledge_base: str
-    total_files: int
-    total_chunks: int
-    processed_files: list[dict[str, Any]]
-
-
-class DeleteResponse(BaseModel):
-    """删除响应模型"""
-    knowledge_base: str
-    status: str
 
 
 @router.post("/upload", response_model=UploadResponse)
@@ -34,7 +17,10 @@ async def upload_documents(
     knowledge_base: str = Form(default="default_knowledge_base",description="目标知识库名称"),
     provider: str = Form(default="openai", description="嵌入模型提供商名称"),
     model: str = Form(default="text-embedding-3-small", description="嵌入模型名称"),
-    api_key: str = Form(default=None, description="API key for the embedding provider (if required)")
+    api_key: str = Form(default=None, description="API key for the embedding provider (if required)"),
+    proxy_url: str = Form(default=None, description="proxy url (if required)"),
+    chunk_size: int = Form(default=1000, description="Define the maximum length of each text block"),
+    chunk_overlap: int = Form(default=200, description="Define the length of the overlap between two adjacent blocks"),
 ):
     """
     上传文档到指定知识库
@@ -63,14 +49,16 @@ async def upload_documents(
                 )
     
     try:
-        result = await document_service.upload_documents(files, knowledge_base, provider, model, api_key)
+        document_service = DocumentService(chunk_size,chunk_overlap)
+        result = await document_service.upload_documents(files, knowledge_base, provider, model, api_key, proxy_url)
         return UploadResponse(**result)
     except Exception as e:
+        logger.exception(e)
         raise HTTPException(status_code=500, detail=f"文档上传失败: {str(e)}")
 
 
 @router.get("/knowledge-bases", response_model=KnowledgeBaseResponse)
-async def list_knowledge_bases():
+async def list_knowledge_bases(request: Request):
     """
     获取所有知识库列表
     
@@ -78,8 +66,9 @@ async def list_knowledge_bases():
         知识库名称列表
     """
     try:
-        knowledge_bases = document_service.list_knowledge_bases()
-        return KnowledgeBaseResponse(knowledge_bases=knowledge_bases)
+        document_service = DocumentService()
+        result = await document_service.list_knowledge_bases()
+        return KnowledgeBaseResponse(knowledge_bases=result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取知识库列表失败: {str(e)}")
 
@@ -96,6 +85,7 @@ async def delete_knowledge_base(knowledge_base: str):
         删除结果
     """
     try:
+        document_service = DocumentService()
         result = await document_service.delete_knowledge_base(knowledge_base)
         return DeleteResponse(**result)
     except Exception as e:
@@ -112,10 +102,8 @@ async def document_service_health():
     """
     try:
         # 测试PostgreSQL连接
-        connection_string = document_service.get_postgres_connection_string()
         return {
             "status": "healthy",
-            "postgres_configured": bool(connection_string),
             "supported_formats": [".pdf", ".txt", ".md", ".doc", ".docx"],
         }
     except Exception as e:

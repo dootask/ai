@@ -1,14 +1,18 @@
 import math
 import re
-
+import time
+st= time.time()
 import numexpr
 from core import settings
 # from langchain_openai import OpenAIEmbeddings
-from langchain_core.embeddings import get_embeddings_by_provider
+from core.embeddings import get_embeddings_by_provider
 from langchain_core.tools import BaseTool, tool
 from langchain_postgres import PGVector
-
-
+from langchain_core.runnables import RunnableConfig
+import asyncio
+from langchain.retrievers import (
+    MergerRetriever,
+)
 def calculator_func(expression: str) -> str:
     """Calculates a math expression using numexpr.
 
@@ -58,74 +62,95 @@ def get_postgres_connection_string() -> str:
     password = settings.POSTGRES_PASSWORD.get_secret_value() if settings.POSTGRES_PASSWORD else ""
     port = settings.POSTGRES_PORT or 5432
     
-    return f"postgresql://{settings.POSTGRES_USER}:{password}@{settings.POSTGRES_HOST}:{port}/{settings.POSTGRES_DB}"
+    return f"postgresql+psycopg://{settings.POSTGRES_USER}:{password}@{settings.POSTGRES_HOST}:{port}/{settings.POSTGRES_DB}"
 
 
-def load_postgres_vectorstore(collection_name: str = "default_knowledge_base", embeddings_config: dict = None):
+def load_postgres_vectorstore(knowledge_base: list[str] = ["default_knowledge_base"], embeddings_config: dict = None):
     """加载PostgreSQL向量存储"""
     try:
         if embeddings_config:
             # 使用传入的配置
             provider = embeddings_config.get("provider", "openai")
             model = embeddings_config.get("model", "text-embedding-3-small")
-            config = embeddings_config.get("config", {})
-
+            config = {
+                "api_key": embeddings_config.get("api_key"),
+                "proxy_url": embeddings_config.get("proxy_url"),
+                "dimensions": embeddings_config.get("dimensions", None)
+            }
         embeddings = get_embeddings_by_provider(provider, model, tuple(sorted(config.items())))
     except Exception as e:
-        raise RuntimeError(
-            "初始化Embeddings失败。请确保已设置相应的API密钥。"
-        ) from e
+        raise RuntimeError( "初始化Embeddings失败。请确保已设置相应的API密钥。" ) from e
 
     # 获取PostgreSQL连接字符串
     connection_string = get_postgres_connection_string()
-    
-    # 创建PGVector实例
-    vectorstore = PGVector(
-        embeddings=embeddings,
-        connection=connection_string,
-        collection_name=collection_name,
-        use_jsonb=True,
-    )
-    
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-    return retriever
+    retrievers = []
+    for item in knowledge_base:
+        # 创建PGVector实例
+        vectorstore = PGVector(
+            embeddings=embeddings,
+            connection=connection_string,
+            collection_name=item,
+            use_jsonb=True,
+        )
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+        retrievers.append(retriever)
+    lotr = MergerRetriever(retrievers=retrievers)
+    return lotr
+    # async def _run():
+    #     async def search_one(collection: str):
+    #         vs = PGVector(
+    #             collection_name=collection,
+    #             connection=connection_string,
+    #             embeddings=embeddings,
+    #             async_mode=True
+    #         )
+    #         docs = await vs.as_retriever(search_kwargs={"k": 3}).ainvoke(query)
+    #         return [doc.page_content for doc in docs]
+
+    #     results = await asyncio.gather(*[search_one(c) for c in knowledge_base])
+    #     merged = "\n\n".join([f"source: <<{c}>>\n" + "\n".join(r) for c, r in zip(knowledge_base, results)])
+    #     # print(merged)
+    #     return merged
+
+    # # 在同步函数里跑协程
+    # try:
+    #     loop = asyncio.get_running_loop()
+    # except RuntimeError:
+    #     loop = None
+    # if loop and loop.is_running():
+    #     return loop.create_task(_run())
+    # else:
+    #     return asyncio.run(_run())    
 
 
-def database_search_func(query: str, knowledge_base: str = "default_knowledge_base", embeddings_config: dict = None) -> str:
-    """在指定的知识库中搜索信息。
-    
-    Args:
-        query: 搜索查询
-        knowledge_base: 知识库名称，默认为"default_knowledge_base"
-        embeddings_config: embeddings配置，包含provider、model、config等
+
+def database_search_func(query: str, config: RunnableConfig ) -> str:
     """
+    根据用户提供的查询内容，在指定的知识库中执行语义搜索。
+    适用于用户需要从知识库中检索相关信息、背景资料或支持文档的场景。
+
+    Args:
+        query (str): 用户的搜索查询，例如 "张三的研究项目" 或 "产品A的发布时间"。
+
+    Returns:
+        str: 向量检索器对象或检索结果，取决于调用方式。
+    """
+    if not config:
+        raise ValueError("config not found")
+    
+    configurable = config.get("configurable").get("rag_config")
+    configurable = dict(configurable) if configurable else {}
     # 获取PostgreSQL检索器
-    retriever = load_postgres_vectorstore(collection_name=knowledge_base, embeddings_config=embeddings_config)
-
-    # 在数据库中搜索相关文档
+    retriever = load_postgres_vectorstore(knowledge_base=configurable.get("knowledge_base"), embeddings_config=configurable)
+    # # 在数据库中搜索相关文档
     documents = retriever.invoke(query)
-
     # 将文档格式化为字符串
     context_str = format_contexts(documents)
 
     return context_str
 
 
-# 创建动态知识库搜索工具
-def create_database_search_tool(knowledge_base: str = "default_knowledge_base", embeddings_config: dict = None) -> BaseTool:
-    """创建针对特定知识库的搜索工具"""
-    
-    def search_func(query: str) -> str:
-        return database_search_func(query, knowledge_base, embeddings_config)
-    
-    search_func.__name__ = f"database_search_{knowledge_base}"
-    search_func.__doc__ = f"在{knowledge_base}知识库中搜索信息。"
-    
-    tool_instance = tool(search_func)
-    tool_instance.name = f"Database_Search_{knowledge_base}"
-    return tool_instance
 
-
-# 默认数据库搜索工具
-database_search: BaseTool = create_database_search_tool()
+# # 默认数据库搜索工具
+database_search: BaseTool = tool(database_search_func)
 database_search.name = "Database_Search"

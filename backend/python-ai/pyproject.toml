@@ -60,7 +60,7 @@ dependencies = [
     "langchain-xai",
     "langchain_cohere",
     "cohere <= 5.15.0",
-    "langchain_postgres"
+    "langchain_postgres",
 ]
 
 [dependency-groups]

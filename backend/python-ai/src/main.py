@@ -13,7 +13,7 @@ from api.chat_api import router as chat_router
 from api.document_api import router as document_router
 from core import settings
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI,HTTPException, Security
 from langchain_core._api import LangChainBetaWarning
 from langfuse import Langfuse  # type: ignore[import-untyped]
 from memory import initialize_database, initialize_store
@@ -37,6 +37,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             # 只为 Postgres 设置存储，InMemoryStore 不需要设置
             if hasattr(store, "setup"):  # ignore: union-attr
                 await store.setup()
+                app.state.db_pool = store
 
             # 为代理配置内存组件
             agents = get_all_agent_info()
@@ -58,7 +59,7 @@ def create_app() -> FastAPI:
         title="AI 助手 API",
         description="基于 LangGraph 的智能助手服务",
         version="1.0.0",
-        lifespan=lifespan
+        lifespan=lifespan,
     )
     
     # 注册路由
@@ -67,9 +68,7 @@ def create_app() -> FastAPI:
     
     return app
 
-
 app = create_app()
-
 
 @app.get("/health")
 async def health_check():
@@ -78,7 +77,7 @@ async def health_check():
 
     if settings.LANGFUSE_TRACING:
         try:
-            langfuse = Langfuse()
+            langfuse = Langfuse(settings.LANGFUSE_PUBLIC_KEY.get_secret_value(),settings.LANGFUSE_SECRET_KEY.get_secret_value(),settings.LANGFUSE_HOST)
             health_status["langfuse"] = (
                 "connected" if langfuse.auth_check() else "disconnected"
             )
@@ -93,4 +92,4 @@ if __name__ == "__main__":
     import uvicorn
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    uvicorn.run("main:app", host="127.0.0.1", port=8000,reload=settings.is_dev())
+    uvicorn.run("main:app", host="127.0.0.1", port=8005,reload=settings.is_dev())

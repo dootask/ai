@@ -1,3 +1,3 @@
-from service.document_service import document_service
+from service.document_service import DocumentService
 
-__all__ = ["document_service"]
+__all__ = ["DocumentService"]

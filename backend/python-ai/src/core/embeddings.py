@@ -27,6 +27,7 @@ EMBEDDINGS_PROVIDER_MAPPING = {
             "model": "model",
             "api_key": "api_key",
             "openai_proxy": "openai_proxy",
+            "dimensions": 512
         }
     },
     "google": {
@@ -36,6 +37,7 @@ EMBEDDINGS_PROVIDER_MAPPING = {
         "param_mapping": {
             "model": "model",
             "api_key": "api_key",
+            "dimensions": 512
         }
     },
     "azure": {
@@ -51,6 +53,7 @@ EMBEDDINGS_PROVIDER_MAPPING = {
             "azure_endpoint": "azure_endpoint",
             "api_version": "api_version",
             "openai_proxy": "openai_proxy",
+            "dimensions": 512
         },
         "default_values": {
             "api_version": "2024-02-15-preview"
@@ -63,7 +66,8 @@ EMBEDDINGS_PROVIDER_MAPPING = {
         "param_mapping": {
             "model": "model",
             "base_url": "base_url",
-            "api_key": "api_key"
+            "api_key": "api_key",
+            "dimensions": 512
         }
     },
     "cohere": {
@@ -74,6 +78,7 @@ EMBEDDINGS_PROVIDER_MAPPING = {
             "model": "model",
             "base_url": "base_url",
             "cohere_api_key": "api_key",
+            "dimensions": 512
         }
     },
 }
@@ -141,14 +146,11 @@ def get_embeddings_by_provider(
 
     # 创建并返回模型实例
     model_class = provider_config["class"]
-    print(f"创建 {provider_name} 嵌入模型: {model_name}")
     if cfg("proxy_url"):
-        os.environ["https_proxy"] = cfg("proxy_url")
-        os.environ["http_proxy"] = cfg("proxy_url")
+        os.environ["all_proxy"] = cfg("proxy_url")
     try:
         model = model_class(**model_params)
     finally:
         if cfg("proxy_url"):
-            os.environ.pop("https_proxy", None)
-            os.environ.pop("http_proxy", None)
+            del os.environ["all_proxy"]
     return model
