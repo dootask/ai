@@ -14,8 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { useAppContext } from '@/contexts/app-context';
-import { aiModelsApi, getModelDisplayName } from '@/lib/api/ai-models';
 import { getProviderInfo } from '@/lib/ai';
+import { aiModelsApi, getModelDisplayName } from '@/lib/api/ai-models';
 import { AIModelConfig } from '@/lib/types';
 import { Cpu, Edit, Key, Power, Settings, Star, Trash2, Zap } from 'lucide-react';
 import Link from 'next/link';
@@ -333,17 +333,17 @@ export default function ModelDetailPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <p className="text-sm font-medium">关联智能体</p>
-              <p className="text-2xl font-bold">{model.agentCount || 0}</p>
+              <p className="text-2xl font-bold">{model.agent_count || 0}</p>
             </div>
             <Separator />
             <div className="space-y-2">
               <p className="text-sm font-medium">对话次数</p>
-              <p className="text-2xl font-bold">{model.conversationCount || 0}</p>
+              <p className="text-2xl font-bold">{model.conversation_count || 0}</p>
             </div>
             <Separator />
             <div className="space-y-2">
               <p className="text-sm font-medium">Token使用</p>
-              <p className="text-2xl font-bold">{(model.tokenUsage || 0).toLocaleString()}</p>
+              <p className="text-2xl font-bold">{(model.token_usage || 0).toLocaleString()}</p>
             </div>
           </CardContent>
         </Card>

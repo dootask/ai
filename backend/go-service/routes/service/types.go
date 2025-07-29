@@ -53,7 +53,14 @@ type StreamLineData struct {
 
 // StreamMessageData 消息数据结构
 type StreamMessageData struct {
-	Content string
+	Content       string
+	UsageMetadata StreamUsageMetadata `json:"usage_metadata"`
+}
+
+// StreamUsageMetadata 使用量元数据
+type StreamUsageMetadata struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
 }
 
 // StreamErrorData 错误数据结构

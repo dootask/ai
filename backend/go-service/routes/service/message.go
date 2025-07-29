@@ -97,7 +97,7 @@ func (h *MessageHandler) handleMessageMessage(v StreamLineData, req WebhookReque
 	// 处理可能包含HTML的内容
 	processedContent := h.processHTMLContent(StreamMessageData.Content)
 
-	h.createMessage(req, processedContent, startTime, status)
+	h.createMessage(req, processedContent, startTime, status, StreamMessageData.UsageMetadata.InputTokens, StreamMessageData.UsageMetadata.OutputTokens)
 	h.sendDooTaskMessage(req, processedContent)
 }
 
@@ -143,7 +143,7 @@ func (h *MessageHandler) handleErrorMessage(v StreamLineData, req WebhookRequest
 		processedErrorMsg := h.processHTMLContent(StreamErrorData.Error.Message)
 
 		h.sendSSEResponse(w, req, "done", processedErrorMsg)
-		h.createMessage(req, processedErrorMsg, time.Now(), status)
+		h.createMessage(req, processedErrorMsg, time.Now(), status, 0, 0)
 		h.sendDooTaskMessage(req, processedErrorMsg)
 	} else {
 		logError("Error消息内容类型错误", nil, "type:", v.Type, "content:", fmt.Sprintf("%v", v.Content))
@@ -170,7 +170,7 @@ func (h *MessageHandler) handleMessage(v StreamLineData, req WebhookRequest, w i
 }
 
 // createMessage 创建消息
-func (h *MessageHandler) createMessage(req WebhookRequest, content string, startTime time.Time, status int) {
+func (h *MessageHandler) createMessage(req WebhookRequest, content string, startTime time.Time, status int, inputTokens int, outputTokens int) {
 	// 获取对话
 	var agent agents.Agent
 	if err := global.DB.Where("bot_id = ?", req.BotUid).First(&agent).Error; err != nil {
@@ -195,6 +195,7 @@ func (h *MessageHandler) createMessage(req WebhookRequest, content string, start
 		content = string(runes[:200]) + "..."
 	}
 
+	// 创建AI回复消息
 	message := conversations.Message{
 		ConversationID: conversation.ID,
 		SendID:         req.SendId,
@@ -202,8 +203,15 @@ func (h *MessageHandler) createMessage(req WebhookRequest, content string, start
 		Content:        content,
 		ResponseTimeMs: &responseTimeMs,
 		Status:         status,
+		TokensUsed:     outputTokens,
 	}
 	h.db.Create(&message)
+	// 更新用户提问消息的token使用量
+	h.db.Model(&conversations.Message{}).
+		Where("conversation_id = ? AND role = ? AND send_id = ?", conversation.ID, "user", req.SendId).
+		Updates(map[string]interface{}{
+			"tokens_used": inputTokens,
+		})
 }
 
 // logError 统一错误日志格式

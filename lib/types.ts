@@ -323,9 +323,9 @@ export interface AIModelConfig {
   updated_at: string;
   // 前端扩展字段（用于显示）
   displayName?: string;
-  agentCount?: number;
-  conversationCount?: number;
-  tokenUsage?: number;
+  agent_count?: number;
+  conversation_count?: number;
+  token_usage?: number;
   lastUsedAt?: string;
   avgResponseTime?: string;
   successRate?: string;

@@ -20,6 +20,10 @@ type AIModel struct {
 	IsDefault   bool      `json:"is_default" gorm:"default:false"`
 	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+
+	AgentCount        int64 `json:"agent_count" gorm:"-"`
+	ConversationCount int64 `json:"conversation_count" gorm:"-"`
+	TokenUsage        int64 `json:"token_usage" gorm:"-"`
 }
 
 // TableName 设置表名

@@ -1,5 +1,5 @@
 -- Description: 为消息表添加状态字段
--- 添加响应时间字段到messages表，用于记录assistant消息的状态: 1成功 2失败, 默认1
+-- 添加状态字段到messages表，用于记录assistant消息的状态: 1成功 2失败, 默认1
 
 DO $$
 BEGIN

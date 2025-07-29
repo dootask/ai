@@ -2,6 +2,8 @@ package aimodels
 
 import (
 	"dootask-ai/go-service/global"
+	"dootask-ai/go-service/routes/api/agents"
+	"dootask-ai/go-service/routes/api/conversations"
 	"dootask-ai/go-service/utils"
 	"net/http"
 
@@ -167,6 +169,48 @@ func (h *Handler) GetAIModel(c *gin.Context) {
 		}
 		return
 	}
+
+	// 获取关联的智能体数量
+	var agentCount int64
+	if err := global.DB.Model(&agents.Agent{}).Where("ai_model_id = ?", model.ID).Count(&agentCount).Error; err != nil {
+		c.JSON(http.StatusUnprocessableEntity, ErrorResponse{
+			Success: false,
+			Error:   "查询关联智能体数量失败",
+			Code:    "AI_MODEL_001",
+		})
+		return
+	}
+	model.AgentCount = agentCount
+
+	// 获取关联的对话数量
+	var conversationCount int64
+	if err := global.DB.Model(&agents.Agent{}).Joins(
+		"LEFT JOIN conversations ON conversations.agent_id = agents.id",
+	).Where("ai_model_id = ?", model.ID).Count(&conversationCount).Error; err != nil {
+		c.JSON(http.StatusUnprocessableEntity, ErrorResponse{
+			Success: false,
+			Error:   "查询关联对话数量失败",
+			Code:    "AI_MODEL_001",
+		})
+		return
+	}
+	model.ConversationCount = conversationCount
+
+	// 获取关联的token使用量
+	var tokenUsage int64
+	if err := global.DB.Model(&conversations.Message{}).Joins(
+		"LEFT JOIN conversations ON conversations.id = messages.conversation_id",
+	).Joins(
+		"LEFT JOIN agents ON agents.id = conversations.agent_id",
+	).Where("agents.ai_model_id = ?", model.ID).Select("SUM(messages.tokens_used)").Scan(&tokenUsage).Error; err != nil {
+		c.JSON(http.StatusUnprocessableEntity, ErrorResponse{
+			Success: false,
+			Error:   "查询关联token使用量失败",
+			Code:    "AI_MODEL_001",
+		})
+		return
+	}
+	model.TokenUsage = tokenUsage
 
 	// 隐藏敏感信息
 	if model.ApiKey != nil && *model.ApiKey != "" {
