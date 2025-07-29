@@ -71,12 +71,8 @@ type DooTaskMessage struct {
 
 // DooTaskMessageContent 消息内容
 type DooTaskMessageContent struct {
-	Text string `json:"Text"`
-}
-
-// DooTaskMessageList 消息列表响应
-type DooTaskMessageList struct {
-	List []DooTaskMessage `json:"List"`
+	Text string  `json:"Text"`
+	Type *string `json:"Type"`
 }
 
 // MessageExtractor 消息提取器接口

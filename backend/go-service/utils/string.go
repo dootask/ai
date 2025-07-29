@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+
+	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 )
 
 // SplitString 分割字符串，并去除空字符串
@@ -70,4 +72,15 @@ func MD5(str string) string {
 func StrToInt(s string) int {
 	num, _ := strconv.Atoi(s)
 	return num
+}
+
+// HTMLToMarkdown 将HTML内容转换为Markdown格式
+func HTMLToMarkdown(html string) (string, error) {
+	// 使用v2库的简单转换函数，它已经包含了base和commonmark插件
+	markdown, err := htmltomarkdown.ConvertString(html)
+	if err != nil {
+		return "", err
+	}
+
+	return markdown, nil
 }

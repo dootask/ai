@@ -11,7 +11,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -121,7 +123,7 @@ func (h *Handler) Webhook(c *gin.Context) {
 	var conversation conversations.Conversation
 	dialogId := strconv.Itoa(webhookResponse.DialogID)
 	userID := strconv.Itoa(int(agent.UserID))
-	if err := global.DB.Where("dootask_chat_id = ? AND dootask_user_id = ?", dialogId, userID).First(&conversation).Error; err != nil {
+	if err := global.DB.Where("agent_id = ? AND dootask_chat_id = ? AND dootask_user_id = ?", agent.ID, dialogId, userID).First(&conversation).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			conversation = conversations.Conversation{
 				AgentID:       agent.ID,
@@ -139,12 +141,18 @@ func (h *Handler) Webhook(c *gin.Context) {
 		}
 	}
 
-	// 创建消息
+	// 使用rune处理Unicode字符，确保正确截取多字节字符
+	text := h.buildUserMessage(req)
+	runes := []rune(text)
+	if len(runes) > 200 {
+		text = string(runes[:200]) + "..."
+	}
+
 	message := conversations.Message{
 		ConversationID: conversation.ID,
 		SendID:         req.SendId,
 		Role:           "user",
-		Content:        h.buildUserMessage(req),
+		Content:        text,
 	}
 	if err := global.DB.Create(&message).Error; err != nil {
 		fmt.Println("创建消息失败:", err)
@@ -163,7 +171,6 @@ func (h *Handler) Stream(c *gin.Context) {
 	streamId := c.Param("streamId")
 
 	cache, err := global.Redis.Get(context.Background(), fmt.Sprintf("stream:%s", streamId)).Result()
-	fmt.Println("cache", cache)
 
 	// 判断流式消息是否存在
 	if err != nil {
@@ -177,7 +184,6 @@ func (h *Handler) Stream(c *gin.Context) {
 		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "流式消息错误")
 		return
 	}
-	fmt.Printf("%+v\n", req)
 
 	// 检查智能体是否存在
 	var agent agents.Agent
@@ -331,9 +337,14 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		threadId = ""
 	}
 
+	text := h.buildUserMessage(req)
+	if text == "" {
+		return nil, errors.New("用户消息为空")
+	}
+
 	// 发送POST请求获取流式响应
 	data := map[string]any{
-		"message":       h.buildUserMessage(req),
+		"message":       text,
 		"provider":      aiModel.Provider,
 		"model":         aiModel.ModelName,
 		"thread_id":     threadId,
@@ -364,16 +375,29 @@ func (h *Handler) buildUserMessage(req WebhookRequest) string {
 
 		// 使用辅助函数提取文本消息
 		text = extractTextFromMessages(messageList)
-	}
-
-	text += req.Text
-	if req.ReplyText != "" {
-		text = fmt.Sprintf(
-			`<quoted_content>
-%s
-</quoted_content>
-
-%s`, req.ReplyText, text)
+	} else {
+		text = req.Text
+		if req.ReplyText != "" {
+			text = fmt.Sprintf("<quoted_content>\n%s\n</quoted_content>\n\n%s", req.ReplyText, text)
+		} else {
+			var tagPath = []string{"<!--task", "<!--path", "<!--report", "<!--file"}
+			if strings.ContainsFunc(text, func(r rune) bool {
+				for _, tag := range tagPath {
+					if strings.Contains(text, tag) {
+						return true
+					}
+				}
+				return false
+			}) {
+				convertMessage, err := global.DooTaskClient.Client.ConvertWebhookMessageToAI(dootask.ConvertWebhookMessageRequest{
+					Msg: text,
+				})
+				if err != nil {
+					fmt.Println("转换消息失败:", err)
+				}
+				text = convertMessage.Msg
+			}
+		}
 	}
 
 	return text
@@ -403,11 +427,31 @@ func extractTextFromMessages(messageList any) string {
 		var listContainer struct {
 			List []any `json:"List"`
 		}
+
 		if err := json.Unmarshal(messageBytes, &listContainer); err == nil {
+			// slices反转
+			slices.Reverse(listContainer.List)
 			for _, message := range listContainer.List {
 				if dooTaskMsg, err := parseMessageFromAny(message); err == nil {
-					if dooTaskMsg.IsTextMessage() {
-						text.WriteString(fmt.Sprintf("%s\n\n", dooTaskMsg.ExtractText()))
+					switch dooTaskMsg.Type {
+					case "text":
+						if dooTaskMsg.Msg.Type != nil {
+							if *dooTaskMsg.Msg.Type == "md" {
+								text.WriteString(fmt.Sprintf("%s\n\n", dooTaskMsg.ExtractText()))
+							} else {
+								md, err := utils.HTMLToMarkdown(dooTaskMsg.ExtractText())
+								if err != nil {
+									fmt.Println("转换HTML为Markdown失败:", err)
+								}
+								text.WriteString(fmt.Sprintf("%s\n\n", md))
+							}
+						} else {
+							md, err := utils.HTMLToMarkdown(dooTaskMsg.ExtractText())
+							if err != nil {
+								log.Fatal(err)
+							}
+							text.WriteString(fmt.Sprintf("%s\n\n", md))
+						}
 					}
 				}
 			}

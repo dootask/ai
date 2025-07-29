@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"dootask-ai/go-service/global"
+	"dootask-ai/go-service/routes/api/agents"
 	"dootask-ai/go-service/routes/api/conversations"
 	"dootask-ai/go-service/utils"
 	"encoding/json"
@@ -93,8 +94,11 @@ func (h *MessageHandler) handleMessageMessage(v StreamLineData, req WebhookReque
 		return
 	}
 
-	h.createMessage(req, StreamMessageData.Content, startTime, status)
-	h.sendDooTaskMessage(req, StreamMessageData.Content)
+	// 处理可能包含HTML的内容
+	processedContent := h.processHTMLContent(StreamMessageData.Content)
+
+	h.createMessage(req, processedContent, startTime, status)
+	h.sendDooTaskMessage(req, processedContent)
 }
 
 // parseErrorContent 解析错误内容
@@ -135,9 +139,12 @@ func (h *MessageHandler) handleErrorMessage(v StreamLineData, req WebhookRequest
 			return
 		}
 
-		h.sendSSEResponse(w, req, "done", StreamErrorData.Error.Message)
-		h.createMessage(req, StreamErrorData.Error.Message, time.Now(), status)
-		h.sendDooTaskMessage(req, StreamErrorData.Error.Message)
+		// 处理可能包含HTML的错误消息
+		processedErrorMsg := h.processHTMLContent(StreamErrorData.Error.Message)
+
+		h.sendSSEResponse(w, req, "done", processedErrorMsg)
+		h.createMessage(req, processedErrorMsg, time.Now(), status)
+		h.sendDooTaskMessage(req, processedErrorMsg)
 	} else {
 		logError("Error消息内容类型错误", nil, "type:", v.Type, "content:", fmt.Sprintf("%v", v.Content))
 	}
@@ -164,11 +171,17 @@ func (h *MessageHandler) handleMessage(v StreamLineData, req WebhookRequest, w i
 
 // createMessage 创建消息
 func (h *MessageHandler) createMessage(req WebhookRequest, content string, startTime time.Time, status int) {
-	// 创建对话
+	// 获取对话
+	var agent agents.Agent
+	if err := global.DB.Where("bot_id = ?", req.BotUid).First(&agent).Error; err != nil {
+		logError("查询智能体失败", err, "bot_id:", fmt.Sprintf("%d", req.BotUid))
+		return
+	}
+
 	var conversation conversations.Conversation
 	dialogId := strconv.Itoa(int(req.DialogId))
 	userID := strconv.Itoa(int(global.DooTaskUser.UserID))
-	if err := h.db.Where("dootask_user_id = ? AND dootask_chat_id = ?", userID, dialogId).First(&conversation).Error; err != nil {
+	if err := h.db.Where("agent_id = ? AND dootask_user_id = ? AND dootask_chat_id = ?", agent.ID, userID, dialogId).First(&conversation).Error; err != nil {
 		logError("查询对话失败", err, "dialog_id:", dialogId, "user_id:", userID)
 		return
 	}
@@ -176,7 +189,12 @@ func (h *MessageHandler) createMessage(req WebhookRequest, content string, start
 	// 计算响应时间
 	responseTimeMs := int(time.Since(startTime).Milliseconds())
 
-	// 创建消息
+	// 使用rune处理Unicode字符，确保正确截取多字节字符
+	runes := []rune(content)
+	if len(runes) > 200 {
+		content = string(runes[:200]) + "..."
+	}
+
 	message := conversations.Message{
 		ConversationID: conversation.ID,
 		SendID:         req.SendId,
@@ -272,6 +290,39 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 			global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", streamId), line)
 		}
 	}
+}
+
+// processHTMLContent 处理可能包含HTML的内容，转换为Markdown
+func (h *MessageHandler) processHTMLContent(content string) string {
+	// 检查内容是否包含HTML标签
+	if !h.containsHTML(content) {
+		return content
+	}
+
+	// 转换HTML为Markdown
+	markdown, err := utils.HTMLToMarkdown(content)
+	if err != nil {
+		logError("HTML转换为Markdown失败", err, "content_length:", fmt.Sprintf("%d", len(content)))
+		// 如果转换失败，返回原内容
+		return content
+	}
+
+	return markdown
+}
+
+// containsHTML 简单检查内容是否包含HTML标签
+func (h *MessageHandler) containsHTML(content string) bool {
+	// 检查常见的HTML标签
+	htmlTags := []string{"<p>", "<div>", "<span>", "<a>", "<img>", "<br>", "<h1>", "<h2>", "<h3>", "<h4>", "<h5>", "<h6>", "<ul>", "<ol>", "<li>", "<strong>", "<b>", "<em>", "<i>", "<code>", "<pre>", "<blockquote>"}
+
+	contentLower := strings.ToLower(content)
+	for _, tag := range htmlTags {
+		if strings.Contains(contentLower, tag) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // 错误处理函数
