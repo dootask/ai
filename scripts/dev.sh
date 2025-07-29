@@ -86,7 +86,7 @@ popd > /dev/null
 # 启动AI服务（后台）
 echo "🤖 启动AI服务 (端口$(getEnv PYTHON_AI_SERVICE_PORT))..."
 pushd backend/python-ai/src > /dev/null
-../.venv/bin/uvicorn service:app --host 0.0.0.0 --port $(getEnv PYTHON_AI_SERVICE_PORT) --env-file ${CURRENT_DIR}/.env --reload &
+../.venv/bin/uvicorn main:app --host 0.0.0.0 --port $(getEnv PYTHON_AI_SERVICE_PORT) --env-file ${CURRENT_DIR}/.env --reload &
 AI_PID=$!
 popd > /dev/null
 
@@ -128,7 +128,7 @@ cat > scripts/stop.sh << EOF
 echo "🛑 停止所有开发服务..."
 docker-compose -f ${CURRENT_DIR}/docker/docker-compose.dev.yml --env-file ${CURRENT_DIR}/.env down
 pkill -f "air --build.cmd"
-pkill -f "uvicorn service:app"
+pkill -f "uvicorn main:app"
 pkill -f "next dev"
 echo "✅ 所有服务已停止"
 EOF
