@@ -21,7 +21,7 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
-    "@dootask/tools": "^1.1.2",
+    "@dootask/tools": "^1.1.5",
     "@hookform/resolvers": "^5.1.1",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-avatar": "^1.1.10",

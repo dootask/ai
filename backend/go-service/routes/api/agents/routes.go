@@ -487,24 +487,26 @@ func UpdateAgent(c *gin.Context) {
 			})
 			return
 		}
-		var knowledgeBaseCount int64
-		if err := global.DB.Model(&struct {
-			ID int64 `gorm:"primaryKey"`
-		}{}).Table("knowledge_bases").Where("id IN (?) AND user_id = ?", kbIDs, global.DooTaskUser.UserID).Count(&knowledgeBaseCount).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    "DATABASE_001",
-				"message": "验证知识库失败",
-				"data":    nil,
-			})
-			return
-		}
-		if knowledgeBaseCount == 0 {
-			c.JSON(http.StatusUnprocessableEntity, gin.H{
-				"code":    "KNOWLEDGE_BASE_001",
-				"message": "指定的知识库不存在",
-				"data":    nil,
-			})
-			return
+		if len(kbIDs) > 0 {
+			var knowledgeBaseCount int64
+			if err := global.DB.Model(&struct {
+				ID int64 `gorm:"primaryKey"`
+			}{}).Table("knowledge_bases").Where("id IN (?) AND user_id = ?", kbIDs, global.DooTaskUser.UserID).Count(&knowledgeBaseCount).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"code":    "DATABASE_001",
+					"message": "验证知识库失败",
+					"data":    nil,
+				})
+				return
+			}
+			if knowledgeBaseCount == 0 {
+				c.JSON(http.StatusUnprocessableEntity, gin.H{
+					"code":    "KNOWLEDGE_BASE_001",
+					"message": "指定的知识库不存在",
+					"data":    nil,
+				})
+				return
+			}
 		}
 	}
 
@@ -519,24 +521,26 @@ func UpdateAgent(c *gin.Context) {
 			})
 			return
 		}
-		var toolCount int64
-		if err := global.DB.Model(&struct {
-			ID int64 `gorm:"primaryKey"`
-		}{}).Table("mcp_tools").Where("id IN (?) AND user_id = ?", toolIDs, global.DooTaskUser.UserID).Count(&toolCount).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    "DATABASE_001",
-				"message": "验证工具失败",
-				"data":    nil,
-			})
-			return
-		}
-		if toolCount == 0 {
-			c.JSON(http.StatusUnprocessableEntity, gin.H{
-				"code":    "MCP_TOOL_001",
-				"message": "指定的工具不存在",
-				"data":    nil,
-			})
-			return
+		if len(toolIDs) > 0 {
+			var toolCount int64
+			if err := global.DB.Model(&struct {
+				ID int64 `gorm:"primaryKey"`
+			}{}).Table("mcp_tools").Where("id IN (?) AND user_id = ?", toolIDs, global.DooTaskUser.UserID).Count(&toolCount).Error; err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"code":    "DATABASE_001",
+					"message": "验证工具失败",
+					"data":    nil,
+				})
+				return
+			}
+			if toolCount == 0 {
+				c.JSON(http.StatusUnprocessableEntity, gin.H{
+					"code":    "MCP_TOOL_001",
+					"message": "指定的工具不存在",
+					"data":    nil,
+				})
+				return
+			}
 		}
 	}
 
