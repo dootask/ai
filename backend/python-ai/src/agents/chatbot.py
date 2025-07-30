@@ -26,14 +26,10 @@ async def chatbot(
     if previous:
         messages = previous["messages"] + messages
     else:
-        preprocessor = RunnableLambda(
-            lambda state: [SystemMessage(content=configurable.get("agent_config").get("prompt",""))] + state["messages"],
-            name="PromptChatbot",
-        )
-        llm = preprocessor | model
+        agent_config = config = dict(configurable.get("agent_config")) if configurable.get("agent_config") else {}
+        messages = [SystemMessage(content=agent_config.get("prompt",""))] + messages
 
-
-    response = await llm.ainvoke(messages, stream_usage=True)
+    response = await llm.ainvoke(messages,  stream_usage=True)
     # print(response)
     return entrypoint.final(
         value={"messages": [response]}, save={"messages": messages + [response]}
