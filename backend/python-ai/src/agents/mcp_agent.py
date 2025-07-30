@@ -20,6 +20,7 @@ async def mcp_agent(
     # if previous:
     #     messages = previous["messages"] + messages
     configurable = config.get("configurable",{})
+    
     # 2. 动态决定模型
     model = get_model_by_provider(
         configurable.get("provider", "openai"),
@@ -50,7 +51,8 @@ async def mcp_agent(
     )
     builder.add_edge("tools", "call_model")
     graph = builder.compile()
-    messages = [SystemMessage(content=configurable.get("agent_config").get("prompt",""))] + messages
+    agent_config = dict(configurable.get("agent_config", None)) if configurable.get("agent_config", None) else {}
+    messages = [SystemMessage(content=agent_config.get("prompt",""))] + messages
     response = await graph.ainvoke({"messages": messages})
     final_messages = response["messages"]
     print(response)
