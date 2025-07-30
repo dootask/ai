@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 import time
 from functools import cache
@@ -15,7 +16,7 @@ from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langchain_xai import ChatXAI
-
+from langchain_qwq import ChatQwQ
 
 class FakeToolModel(FakeListChatModel):
     def __init__(self, responses: list[str]):
@@ -156,7 +157,7 @@ PROVIDER_MODEL_MAPPING = {
         }
     },
     "alibaba": {
-        "class": ChatOpenAI,
+        "class": ChatQwQ,
         "params": {
             "streaming": True,
         },
@@ -167,7 +168,7 @@ PROVIDER_MODEL_MAPPING = {
             "api_key": "api_key",
             "temperature": "temperature",
             "openai_proxy": "openai_proxy",
-            "max_tokens": "max_tokens",
+            "max_tokens": "max_tokens"
         }
     },
     "cohere": {
@@ -205,7 +206,7 @@ PROVIDER_MODEL_MAPPING = {
 def get_model_by_provider(
     provider_name: str, 
     model_name: str, 
-    config_tuple: dict | None
+    config_str: str | None
 ) -> ModelT:
     """
     根据提供商名称直接返回对应的模型实例
@@ -218,9 +219,9 @@ def get_model_by_provider(
     Returns:
         ModelT: 对应的模型实例
     """
-    if config_tuple is None:
+    if config_str is None:
         config = {}
-    config = dict(config_tuple) if config_tuple else {}
+    config = json.loads(config_str) if config_str else {}
 
     def cfg(key: str, default=None):
         return config.get(key, default)
@@ -242,20 +243,23 @@ def get_model_by_provider(
     model_params.update(provider_config["params"])
     
     # 添加映射参数
-    for model_param, config_key in provider_config["param_mapping"].items():
+    for config_key, _ in provider_config["param_mapping"].items():
         if config_key == "model":
-            model_params[model_param] = model_name
+            model_params[config_key] = model_name
         elif config_key == "azure_endpoint":
-            model_params[model_param] = cfg("base_url", None)
+            model_params[config_key] = cfg("base_url", None)
         elif config_key == "deployment_name":
-            model_params[model_param] = model_name
+            model_params[config_key] = model_name
         elif config_key == "openai_proxy":
-            model_params[model_param] = cfg("proxy_url")
+            model_params[config_key] = cfg("proxy_url")
         else:
             value = cfg(config_key)
             if value is not None:
-                model_params[model_param] = value
-    
+                model_params[config_key] = value
+
+    if cfg("extra") and isinstance(cfg("extra"),dict):
+        for k,v in cfg("extra").items():
+            model_params[k] = v
     # 添加默认值
     if "default_values" in provider_config:
         for param, default_value in provider_config["default_values"].items():

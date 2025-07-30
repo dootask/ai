@@ -61,17 +61,17 @@ class ChatService:
                     detail=f"agent_config contains reserved keys: {overlap}",
                 )
             configurable.update(user_input.agent_config)
-            configurable["agent_config"] = tuple(sorted(user_input.agent_config.items()))
+            configurable["agent_config"] = json.dumps(user_input.agent_config)
 
         if user_input.mcp_config:
-            configurable["mcp_config"] = tuple(sorted(user_input.mcp_config.items()))
+            configurable["mcp_config"] = json.dumps(user_input.mcp_config)
         if user_input.rag_config:
             if not user_input.rag_config.get("knowledge_base") or len(user_input.rag_config.get("knowledge_base") or []) > 3:
                 raise HTTPException(
                     status_code=422,
                     detail=f"knowledge_base only supports 3 at most",
                 )
-            configurable["rag_config"] = tuple(sorted(user_input.rag_config.items()))
+            configurable["rag_config"] = json.dumps(user_input.rag_config)
 
         config = RunnableConfig(
             configurable=configurable,

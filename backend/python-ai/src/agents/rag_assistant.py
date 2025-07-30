@@ -1,4 +1,5 @@
 from datetime import datetime
+import json
 from typing import Literal
 
 from agents.llama_guard import LlamaGuard, LlamaGuardOutput, SafetyAssessment
@@ -66,7 +67,8 @@ async def acall_model(state: AgentState, config: RunnableConfig) -> AgentState:
         configurable.get("model", settings.DEFAULT_MODEL),
         configurable.get("agent_config", None),
     )
-    agent_config = dict(configurable.get("agent_config", None)) if configurable.get("agent_config", None) else {}
+    
+    agent_config = json.loads(configurable.get("agent_config", None)) if configurable.get("agent_config", None) else {}
     model_runnable = wrap_model(m,agent_config.get("prompt"))
     response = await model_runnable.ainvoke(state, config)
 

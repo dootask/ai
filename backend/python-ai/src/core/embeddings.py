@@ -1,3 +1,4 @@
+import json
 import os
 from functools import cache
 from typing import Optional, TypeAlias
@@ -87,7 +88,7 @@ EMBEDDINGS_PROVIDER_MAPPING = {
 def get_embeddings_by_provider(
     provider_name: str, 
     model_name: str, 
-    config_tuple: dict | None = None
+    config_str: str | None = None
 ) -> EmbeddingsModelT:
     """
     根据提供商名称直接返回对应的嵌入模型实例
@@ -100,9 +101,9 @@ def get_embeddings_by_provider(
     Returns:
         EmbeddingsModelT: 对应的嵌入模型实例
     """
-    if config_tuple is None:
+    if config_str is None:
         config = {}
-    config = dict(config_tuple) if config_tuple else {}
+    config = json.loads(config_str) if config_str else {}
 
     def cfg(key: str, default=None):
         return config.get(key, default)

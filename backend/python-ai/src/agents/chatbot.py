@@ -1,3 +1,4 @@
+import json
 from typing import Any
 from core import get_model_by_provider, settings
 from langchain_core.messages import BaseMessage, SystemMessage
@@ -26,7 +27,7 @@ async def chatbot(
     if previous:
         messages = previous["messages"] + messages
     else:
-        agent_config = config = dict(configurable.get("agent_config")) if configurable.get("agent_config") else {}
+        agent_config = json.loads(configurable.get("agent_config")) if configurable.get("agent_config") else {}
         messages = [SystemMessage(content=agent_config.get("prompt",""))] + messages
 
     response = await llm.ainvoke(messages,  stream_usage=True)
