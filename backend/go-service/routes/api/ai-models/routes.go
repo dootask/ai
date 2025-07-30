@@ -282,6 +282,7 @@ func (h *Handler) CreateAIModel(c *gin.Context) {
 		Temperature: req.Temperature,
 		IsEnabled:   &req.IsEnabled,
 		IsDefault:   req.IsDefault,
+		IsThinking:  req.IsThinking, // 新增字段：是否为思考型模型
 	}
 
 	if err := global.DB.Create(&model).Error; err != nil {
@@ -412,6 +413,9 @@ func (h *Handler) UpdateAIModel(c *gin.Context) {
 	}
 	if req.IsDefault != nil {
 		updates["is_default"] = *req.IsDefault
+	}
+	if req.IsThinking != nil {
+		updates["is_thinking"] = *req.IsThinking
 	}
 
 	// 执行更新

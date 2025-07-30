@@ -158,7 +158,7 @@ func (h *MessageHandler) handleDone(req WebhookRequest, w io.Writer) {
 // handleMessage 根据消息类型分发处理
 func (h *MessageHandler) handleMessage(v StreamLineData, req WebhookRequest, w io.Writer, startTime time.Time, status int) {
 	switch v.Type {
-	case "token":
+	case "token", "thinking":
 		h.handleTokenMessage(v, req, w)
 	case "message":
 		h.handleMessageMessage(v, req, startTime, status)
@@ -233,17 +233,18 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 	reader := bufio.NewReader(body)
 
 	var tokenBuffer []string
+	var currentMessageType string = "token" // 默认消息类型
 	lastCompressTime := time.Now()
 	// 获取流间隔时间
 	streamInterval, _ := strconv.Atoi(utils.GetEnvWithDefault("AI_STREAM_INTERVAL", "100"))
 	compressInterval := time.Duration(streamInterval) * time.Millisecond
 
 	// 压缩并写入Redis的函数
-	compressAndWrite := func() {
+	compressAndWrite := func(messageType string) {
 		if len(tokenBuffer) > 0 {
 			combinedContent := strings.Join(tokenBuffer, "")
 			compressedMessage := StreamLineData{
-				Type:    "token",
+				Type:    messageType,
 				Content: combinedContent,
 			}
 			if jsonData, err := json.Marshal(compressedMessage); err == nil {
@@ -256,7 +257,7 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 	for {
 		select {
 		case <-ctx.Done():
-			compressAndWrite()
+			compressAndWrite(currentMessageType)
 			logError("AI响应读取超时", nil, "stream_id:", streamId)
 			return
 		default:
@@ -265,7 +266,7 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err.Error() == "EOF" {
-				compressAndWrite()
+				compressAndWrite(currentMessageType)
 				break
 			}
 			logError("读取数据失败", err)
@@ -277,7 +278,7 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 		}
 
 		if line == "[DONE]" {
-			compressAndWrite()
+			compressAndWrite(currentMessageType)
 			break
 		}
 
@@ -286,11 +287,12 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 			continue
 		}
 
-		if v.Type == "token" {
+		if v.Type == "token" || v.Type == "thinking" {
 			if content, ok := v.Content.(string); ok {
+				currentMessageType = v.Type // 更新当前消息类型
 				tokenBuffer = append(tokenBuffer, content)
 				if time.Since(lastCompressTime) >= compressInterval {
-					compressAndWrite()
+					compressAndWrite(v.Type)
 					lastCompressTime = time.Now()
 				}
 			}

@@ -352,6 +352,11 @@ export default function ModelsPage() {
                             <Badge variant="default" className={providerInfo.color}>
                               {providerInfo.name}
                             </Badge>
+                            {model.is_thinking && (
+                              <Badge variant="secondary" className="text-xs">
+                                思考型
+                              </Badge>
+                            )}
                             {model.is_enabled ? (
                               <Badge variant="default" className="bg-green-100 text-xs text-green-800">
                                 启用

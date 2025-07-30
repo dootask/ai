@@ -2,12 +2,12 @@
 
 import { CommandSelect, CommandSelectOption } from '@/components/command-select';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,6 +58,7 @@ export default function EditModelPage() {
           temperature: modelData.temperature,
           is_enabled: modelData.is_enabled,
           is_default: modelData.is_default,
+          is_thinking: modelData.is_thinking, // 新增字段：是否为思考型模型
         });
       } catch (error) {
         console.error('加载AI模型失败:', error);
@@ -347,6 +348,17 @@ export default function EditModelPage() {
                   <Switch
                     checked={formData.is_default ?? model.is_default}
                     onCheckedChange={checked => setFormData(prev => ({ ...prev, is_default: checked }))}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="font-medium">思考型模型</Label>
+                    <p className="text-muted-foreground text-sm">启用推理过程显示，支持思维链输出</p>
+                  </div>
+                  <Switch
+                    checked={formData.is_thinking ?? model.is_thinking}
+                    onCheckedChange={checked => setFormData(prev => ({ ...prev, is_thinking: checked }))}
                   />
                 </div>
               </CardContent>

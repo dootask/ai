@@ -243,6 +243,7 @@ func (h *Handler) Stream(c *gin.Context) {
 
 	// 记录开始时间
 	startTime := time.Now()
+	previousMessageType := ""
 
 	c.Stream(func(w io.Writer) bool {
 		for {
@@ -283,8 +284,21 @@ func (h *Handler) Stream(c *gin.Context) {
 				continue
 			}
 
+			if v.Type == "thinking" {
+				if isFirstLine {
+					v.Content = fmt.Sprintf("::: reasoning\\n%s", v.Content)
+				}
+				v.IsFirst = isFirstLine
+				isFirstLine = false
+				previousMessageType = v.Type
+			}
+
 			// 设置是否为第一行，只有token类型的消息才需要判断
 			if v.Type == "token" {
+				if previousMessageType == "thinking" {
+					isFirstLine = true
+					previousMessageType = ""
+				}
 				v.IsFirst = isFirstLine
 				isFirstLine = false
 			}
@@ -329,7 +343,9 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		"proxy_url":   aiModel.ProxyURL,
 		"prompt":      agent.Prompt,
 		"spicy_level": 0,
-		"temperature": aiModel.Temperature,
+	}
+	if aiModel.IsThinking {
+		agentConfig["temperature"] = 0.0
 	}
 
 	threadId := fmt.Sprintf("%d_%d", req.DialogId, req.SessionId)

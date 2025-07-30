@@ -319,6 +319,7 @@ export interface AIModelConfig {
   temperature: number;
   is_enabled: boolean;
   is_default: boolean;
+  is_thinking: boolean; // 新增字段：是否为思考型模型
   created_at: string;
   updated_at: string;
   // 前端扩展字段（用于显示）
@@ -343,6 +344,7 @@ export interface CreateAIModelRequest {
   temperature: number;
   is_enabled: boolean;
   is_default: boolean;
+  is_thinking?: boolean; // 新增字段：是否为思考型模型
 }
 
 export interface UpdateAIModelRequest {
@@ -356,6 +358,7 @@ export interface UpdateAIModelRequest {
   temperature?: number;
   is_enabled?: boolean;
   is_default?: boolean;
+  is_thinking?: boolean; // 新增字段：是否为思考型模型
 }
 
 export interface AIModelListResponse {

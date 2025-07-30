@@ -2,12 +2,12 @@
 
 import { Badge } from '@/components/ui/badge';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -156,6 +156,11 @@ export default function ModelDetailPage() {
             </div>
             <h1 className="text-3xl font-bold tracking-tight">{displayName}</h1>
             <Badge variant={model.is_enabled ? 'default' : 'secondary'}>{model.is_enabled ? '启用' : '停用'}</Badge>
+            {model.is_thinking && (
+              <Badge variant="secondary" className="text-xs">
+                思考型
+              </Badge>
+            )}
             {model.is_default && (
               <Badge variant="outline" className="border-yellow-500 text-yellow-700">
                 <Star className="mr-1 h-3 w-3" />
@@ -249,6 +254,18 @@ export default function ModelDetailPage() {
             <div className="space-y-2">
               <p className="text-sm font-medium">使用代理请求</p>
               <p className="text-muted-foreground text-sm truncate">{model.proxy_url || '未配置'}</p>
+            </div>
+            <Separator />
+            <div className="space-y-2">
+              <p className="text-sm font-medium">思考型模型</p>
+              <div className="flex items-center gap-2">
+                <Badge variant={model.is_thinking ? 'default' : 'secondary'}>
+                  {model.is_thinking ? '是' : '否'}
+                </Badge>
+                <p className="text-muted-foreground text-xs">
+                  {model.is_thinking ? '支持推理过程显示' : '直接输出结果'}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
