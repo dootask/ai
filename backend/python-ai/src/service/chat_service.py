@@ -182,8 +182,8 @@ class ChatService:
                                 update_messages = [update_messages[-1]]
                             else:
                                 update_messages = []
-
-                        if node in ("research_expert", "math_expert"):
+                        # print("0-------->",node)
+                        if node in ("research_expert", "math_expert", "mcp_agent"):
                             update_messages = []
                         new_messages.extend(update_messages)
 
