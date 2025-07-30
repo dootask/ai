@@ -18,6 +18,7 @@ from langchain_core._api import LangChainBetaWarning
 from langfuse import Langfuse  # type: ignore[import-untyped]
 from memory import initialize_database, initialize_store
 from schema.schema import ServiceMetadata
+from langfuse.callback import CallbackHandler
 
 load_dotenv()
 
@@ -30,15 +31,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     应用程序生命周期管理，初始化数据库检查点和存储
     """
     try:
+        if settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
+            langfuse_handler = CallbackHandler(settings.LANGFUSE_PUBLIC_KEY.get_secret_value(),settings.LANGFUSE_SECRET_KEY.get_secret_value(),settings.LANGFUSE_HOST)
+            app.state.langfuse_handler = langfuse_handler        
         # 初始化检查点（短期内存）和存储（长期内存）
         async with initialize_database() as saver, initialize_store() as store:
             # 设置组件
             if hasattr(saver, "setup"):  # ignore: union-attr
-                await saver.setup()
+                await saver.setup() # type: ignore
             # 只为 Postgres 设置存储，InMemoryStore 不需要设置
             if hasattr(store, "setup"):  # ignore: union-attr
-                await store.setup()
-                app.state.db_pool = store
+                await store.setup() # type: ignore
 
             # 为代理配置内存组件
             agents = get_all_agent_info()
@@ -86,10 +89,11 @@ async def health_check():
 
     if settings.LANGFUSE_TRACING:
         try:
-            langfuse = Langfuse(settings.LANGFUSE_PUBLIC_KEY.get_secret_value(),settings.LANGFUSE_SECRET_KEY.get_secret_value(),settings.LANGFUSE_HOST)
-            health_status["langfuse"] = (
-                "connected" if langfuse.auth_check() else "disconnected"
-            )
+            if settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
+                langfuse = Langfuse(settings.LANGFUSE_PUBLIC_KEY.get_secret_value(),settings.LANGFUSE_SECRET_KEY.get_secret_value(),settings.LANGFUSE_HOST)
+                health_status["langfuse"] = (
+                    "connected" if langfuse.auth_check() else "disconnected"
+                )
         except Exception as e:
             logger.error(f"Langfuse 连接错误: {e}")
             health_status["langfuse"] = "disconnected"
