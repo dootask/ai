@@ -17,6 +17,7 @@ from fastapi import FastAPI,HTTPException, Security
 from langchain_core._api import LangChainBetaWarning
 from langfuse import Langfuse  # type: ignore[import-untyped]
 from memory import initialize_database, initialize_store
+from schema.schema import ServiceMetadata
 
 load_dotenv()
 
@@ -69,6 +70,14 @@ def create_app() -> FastAPI:
     return app
 
 app = create_app()
+
+@app.get("/info")
+async def info() -> ServiceMetadata:
+    return ServiceMetadata(
+        agents=get_all_agent_info(),
+        default_agent="chatbot",
+        default_model=settings.DEFAULT_MODEL,
+    )
 
 @app.get("/health")
 async def health_check():

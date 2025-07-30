@@ -1,7 +1,7 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from langsmith import Client as LangsmithClient
 
@@ -23,7 +23,7 @@ chat_service = ChatService()
 
 @router.post("/{agent_id}/invoke")
 @router.post("/invoke")
-async def invoke(user_input: UserInput, agent_id: str = DEFAULT_AGENT) -> ChatMessage:
+async def invoke(request: Request, user_input: UserInput, agent_id: str = DEFAULT_AGENT) -> ChatMessage:
     """
     调用代理获取最终响应
     
@@ -32,7 +32,10 @@ async def invoke(user_input: UserInput, agent_id: str = DEFAULT_AGENT) -> ChatMe
     使用 user_id 来在多个线程间持久化和继续对话。
     """
     try:
-        return await chat_service.invoke_agent(user_input, agent_id)
+        callback = None
+        if request.app.state.langfuse_handler:
+            callback = request.app.state.langfuse_handler
+        return await chat_service.invoke_agent(callback, user_input, agent_id)
     except Exception as e:
         logger.exception(f"An exception occurred: {e}")
         raise HTTPException(status_code=500, detail="Unexpected error")
@@ -60,7 +63,7 @@ def _sse_response_example() -> dict[int | str, Any]:
     response_class=StreamingResponse,
 )
 async def stream(
-    user_input: StreamInput, agent_id: str = DEFAULT_AGENT
+    request: Request, user_input: StreamInput, agent_id: str = DEFAULT_AGENT
 ) -> StreamingResponse:
     """
     流式传输代理对用户输入的响应，包括中间消息和令牌
@@ -71,8 +74,11 @@ async def stream(
     
     设置 `stream_tokens=false` 来返回中间消息但不逐令牌返回。
     """
+    callback = None
+    if request.app.state.langfuse_handler:
+        callback = request.app.state.langfuse_handler
     return StreamingResponse(
-        chat_service.message_generator(user_input, agent_id),
+        chat_service.message_generator(callback, user_input, agent_id),
         media_type="text/event-stream",
     )
 
