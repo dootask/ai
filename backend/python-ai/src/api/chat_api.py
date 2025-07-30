@@ -33,7 +33,7 @@ async def invoke(request: Request, user_input: UserInput, agent_id: str = DEFAUL
     """
     try:
         callback = None
-        if request.app.state.langfuse_handler:
+        if getattr(request.app.state, 'langfuse_handler', None):
             callback = request.app.state.langfuse_handler
         return await chat_service.invoke_agent(callback, user_input, agent_id)
     except Exception as e:
@@ -75,7 +75,7 @@ async def stream(
     设置 `stream_tokens=false` 来返回中间消息但不逐令牌返回。
     """
     callback = None
-    if request.app.state.langfuse_handler:
+    if getattr(request.app.state, 'langfuse_handler', None):
         callback = request.app.state.langfuse_handler
     return StreamingResponse(
         chat_service.message_generator(callback, user_input, agent_id),
