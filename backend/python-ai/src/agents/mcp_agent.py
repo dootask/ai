@@ -1,3 +1,4 @@
+import json
 from core import get_model_by_provider, settings
 from langchain_core.messages import BaseMessage,SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -30,7 +31,7 @@ async def mcp_agent(
     config_tuple = configurable.get("mcp_config", None)
     if config_tuple is None:
         config = {}
-    mcp_config = dict(config_tuple) if config_tuple else {}
+    mcp_config = json.loads(config_tuple) if config_tuple else {}
     print(mcp_config)
     client = MultiServerMCPClient(
         mcp_config
@@ -51,7 +52,7 @@ async def mcp_agent(
     )
     builder.add_edge("tools", "call_model")
     graph = builder.compile()
-    agent_config = dict(configurable.get("agent_config", None)) if configurable.get("agent_config", None) else {}
+    agent_config = json.loads(configurable.get("agent_config", None)) if configurable.get("agent_config", None) else {}
     messages = [SystemMessage(content=agent_config.get("prompt",""))] + messages
     response = await graph.ainvoke({"messages": messages})
     final_messages = response["messages"]

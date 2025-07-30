@@ -1,3 +1,4 @@
+import json
 import math
 import re
 import time
@@ -139,7 +140,7 @@ def database_search_func(query: str, config: RunnableConfig ) -> str:
         raise ValueError("config not found")
     
     configurable = config.get("configurable").get("rag_config")
-    configurable = dict(configurable) if configurable else {}
+    configurable = json.loads(configurable) if configurable else {}
     # 获取PostgreSQL检索器
     retriever = load_postgres_vectorstore(knowledge_base=configurable.get("knowledge_base"), embeddings_config=configurable)
     # # 在数据库中搜索相关文档

@@ -1,4 +1,4 @@
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
 from langchain_core.messages import ChatMessage as LangchainChatMessage
 from langchain_core.messages import HumanMessage, ToolMessage
 from schema import ChatMessage
@@ -55,6 +55,12 @@ def langchain_to_chat_message(message: BaseMessage) -> ChatMessage:
                 return custom_message
             else:
                 raise ValueError(f"Unsupported chat message role: {message.role}")
+        case SystemMessage():
+            system_message = ChatMessage(
+                type="custom",
+                content=convert_message_content_to_string(message.content),
+            )
+            return system_message
         case _:
             raise ValueError(f"Unsupported message type: {message.__class__.__name__}")
 

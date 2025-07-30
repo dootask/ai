@@ -99,6 +99,7 @@ class UserInput(BaseModel):
                 "temperature": 0.7,
                 "max_token": None,
                 "prompt": "你是一个聊天助手",
+                "extra": {}
             }
         ],
     )
