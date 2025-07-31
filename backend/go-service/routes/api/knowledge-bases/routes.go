@@ -1,9 +1,14 @@
 package knowledgebases
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"dootask-ai/go-service/global"
 	"dootask-ai/go-service/utils"
@@ -207,8 +212,21 @@ func CreateKnowledgeBase(c *gin.Context) {
 		EmbeddingModel: req.EmbeddingModel,
 		ChunkSize:      req.ChunkSize,
 		ChunkOverlap:   req.ChunkOverlap,
-		Metadata:       req.Metadata,
-		IsActive:       true,
+		ApiKey: func() string {
+			if req.ApiKey != nil {
+				return *req.ApiKey
+			}
+			return ""
+		}(),
+		Provider: req.Provider, // 新增
+		ProxyURL: func() string {
+			if req.ProxyURL != nil {
+				return *req.ProxyURL
+			}
+			return ""
+		}(), // 新增
+		Metadata: req.Metadata,
+		IsActive: true,
 	}
 
 	if err := global.DB.Create(&kb).Error; err != nil {
@@ -397,6 +415,15 @@ func UpdateKnowledgeBase(c *gin.Context) {
 	}
 	if req.ChunkOverlap != nil {
 		updateData["chunk_overlap"] = *req.ChunkOverlap
+	}
+	if req.ApiKey != nil {
+		updateData["api_key"] = *req.ApiKey
+	}
+	if req.Provider != nil {
+		updateData["provider"] = *req.Provider
+	}
+	if req.ProxyURL != nil {
+		updateData["proxy_url"] = *req.ProxyURL
 	}
 	if req.Metadata != nil {
 		updateData["metadata"] = req.Metadata
@@ -652,7 +679,8 @@ func ListDocuments(c *gin.Context) {
 
 	// 设置处理状态
 	for i := range documents {
-		if documents[i].ChunksCount > 0 {
+		if documents[i].ChunkIndex > 0 {
+			documents[i].ChunksCount = documents[i].ChunkIndex
 			documents[i].ProcessStatus = "processed"
 		} else {
 			documents[i].ProcessStatus = "processing"
@@ -682,6 +710,26 @@ func UploadDocument(c *gin.Context) {
 		return
 	}
 
+	// 检查知识库是否存在
+	var kb KnowledgeBase
+	if err := global.DB.First(&kb, kbId).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			c.JSON(http.StatusNotFound, gin.H{
+				"code":    "KB_002",
+				"message": "知识库不存在",
+				"data":    nil,
+			})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    "DATABASE_001",
+				"message": "查询知识库失败",
+				"data":    nil,
+			})
+		}
+		return
+	}
+
+	// 解析JSON请求
 	var req UploadDocumentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -703,31 +751,12 @@ func UploadDocument(c *gin.Context) {
 		return
 	}
 
-	// 检查知识库是否存在
-	var kb KnowledgeBase
-	if err := global.DB.First(&kb, kbId).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
-			c.JSON(http.StatusNotFound, gin.H{
-				"code":    "KB_002",
-				"message": "知识库不存在",
-				"data":    nil,
-			})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"code":    "DATABASE_001",
-				"message": "查询知识库失败",
-				"data":    nil,
-			})
-		}
-		return
-	}
-
 	// 设置默认值
 	if req.Metadata == nil {
 		req.Metadata = []byte("{}")
 	}
 
-	// 创建文档
+	// 创建文档记录
 	doc := KBDocument{
 		KnowledgeBaseID: kbId,
 		Title:           req.Title,
@@ -736,27 +765,106 @@ func UploadDocument(c *gin.Context) {
 		FileType:        req.FileType,
 		FileSize:        req.FileSize,
 		Metadata:        req.Metadata,
-		ChunkIndex:      0,
 		IsActive:        true,
 	}
 
 	if err := global.DB.Create(&doc).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    "DATABASE_002",
-			"message": "上传文档失败",
-			"data":    nil,
+			"message": "保存文档记录失败",
+			"data":    err.Error(),
 		})
 		return
 	}
 
-	// TODO: 这里应该异步启动文档处理和向量化任务
-	// 现在只是返回创建的文档信息
+	uploadedDocs := []KBDocument{doc}
+
+	// 调用AI服务处理文档
+	baseURL := utils.GetEnvWithDefault("AI_BASE_URL", fmt.Sprintf("http://localhost:%s", utils.GetEnvWithDefault("PYTHON_AI_SERVICE_PORT", "8001")))
+	requestTimeout, _ := strconv.Atoi(utils.GetEnvWithDefault("AI_REQUEST_TIMEOUT", "60"))
+
+	httpClient := utils.NewHTTPClient(
+		baseURL,
+		utils.WithTimeout(time.Duration(requestTimeout)*time.Second),
+	)
+
+	// 启动异步处理文档
+	go func(doc KBDocument) {
+		// 准备上传参数
+		additionalParams := map[string]string{
+			"knowledge_base": kb.Name,
+			"provider":       kb.Provider,
+			"model":          kb.EmbeddingModel,
+			"api_key":        kb.ApiKey,
+			"proxy_url":      kb.ProxyURL,
+			"chunk_size":     strconv.Itoa(kb.ChunkSize),
+			"chunk_overlap":  strconv.Itoa(kb.ChunkOverlap),
+		}
+
+		// 根据文件类型创建带扩展名的临时文件
+		fileExt := getFileExtension(doc.FileType)
+		tmpFile, err := os.CreateTemp("", "upload_*"+fileExt)
+		if err != nil {
+			fmt.Printf("创建临时文件失败: %v\n", err)
+			return
+		}
+		defer os.Remove(tmpFile.Name())
+		defer tmpFile.Close()
+
+		// 写入文件内容
+		if _, err := tmpFile.WriteString(doc.Content); err != nil {
+			fmt.Printf("写入临时文件失败: %v\n", err)
+			return
+		}
+
+		// 上传到AI服务
+		response, err := httpClient.UploadFile(
+			context.Background(),
+			"/documents/upload",
+			nil,
+			nil,
+			"POST",
+			tmpFile.Name(),
+			"files",
+			additionalParams,
+		)
+
+		if err != nil {
+			fmt.Printf("上传文档到AI服务失败: %v, doc_id: %d\n", err, doc.ID)
+			return
+		}
+
+		if response.StatusCode != http.StatusOK {
+			fmt.Printf("AI服务返回错误: status=%d, body=%s\n", response.StatusCode, string(response.Body))
+			return
+		}
+
+		var uploadDocumentResponse UploadDocumentResponse
+		if err := json.Unmarshal(response.Body, &uploadDocumentResponse); err != nil {
+			fmt.Printf("解析上传文档响应失败: %v\n", err)
+			return
+		}
+
+		if len(uploadDocumentResponse.ProcessedFiles) == 0 {
+			fmt.Printf("上传文档到AI服务成功: %v, doc_id: %d\n", uploadDocumentResponse, doc.ID)
+			return
+		}
+
+		for _, file := range uploadDocumentResponse.ProcessedFiles {
+			if file.Status == "success" {
+				// 更新文档状态为处理中
+				global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("chunk_index", file.Chunks)
+			} else {
+				fmt.Printf("上传文档到AI服务失败: %v, doc_id: %d\n", file, doc.ID)
+			}
+		}
+	}(uploadedDocs[0])
 
 	// 设置处理状态
-	doc.ProcessStatus = "processing"
-	doc.ChunksCount = 0
+	uploadedDocs[0].ProcessStatus = "processing"
+	uploadedDocs[0].ChunkIndex = 0
 
-	c.JSON(http.StatusOK, doc)
+	c.JSON(http.StatusOK, uploadedDocs[0])
 }
 
 // DeleteDocument 删除文档
@@ -835,4 +943,22 @@ func DeleteDocument(c *gin.Context) {
 		"message": "文档删除成功",
 		"data":    nil,
 	})
+}
+
+// getFileExtension 根据文件类型获取文件扩展名
+func getFileExtension(fileType string) string {
+	switch fileType {
+	case "pdf":
+		return ".pdf"
+	case "docx":
+		return ".docx"
+	case "doc":
+		return ".doc"
+	case "markdown", "md":
+		return ".md"
+	case "txt", "text":
+		return ".txt"
+	default:
+		return ".txt"
+	}
 }

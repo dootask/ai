@@ -29,6 +29,8 @@ interface KnowledgeBaseFormData {
   embeddingModel: string;
   chunkSize?: number;
   chunkOverlap?: number;
+  apiKey?: string;
+  proxyUrl?: string; // 保留：非必填
   metadata?: Record<string, unknown>;
 }
 
@@ -41,6 +43,8 @@ export default function CreateKnowledgeBasePage() {
     embeddingModel: '',
     chunkSize: 1000,
     chunkOverlap: 200,
+    apiKey: '',
+    proxyUrl: '', // 新增：非必填
   });
 
   // 转换为CommandSelect选项
@@ -66,6 +70,13 @@ export default function CreateKnowledgeBasePage() {
     setIsLoading(true);
 
     try {
+      // 从选中的embedding模型中提取provider
+      const selectedModel = embeddingModels.find(model => model.value === formData.embeddingModel);
+      if (!selectedModel) {
+        toast.error('请选择有效的Embedding模型');
+        return;
+      }
+
       // 转换为后端格式
       const backendData = {
         name: formData.name,
@@ -73,8 +84,12 @@ export default function CreateKnowledgeBasePage() {
         embedding_model: formData.embeddingModel,
         chunk_size: formData.chunkSize,
         chunk_overlap: formData.chunkOverlap,
+        api_key: formData.apiKey || undefined,
+        provider: selectedModel.provider, // 从选中的模型中提取
+        proxy_url: formData.proxyUrl || undefined,
         is_active: true,
       };
+      
       const newKB = await knowledgeBasesApi.create(backendData);
       toast.success(`知识库 "${newKB.name}" 创建成功！`);
       router.push('/knowledge');
@@ -196,6 +211,30 @@ export default function CreateKnowledgeBasePage() {
                       <p>模型：{selectedModel.label}</p>
                     </div>
                   )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="proxyUrl">代理 URL</Label>
+                  <Input
+                    id="proxyUrl"
+                    type="url"
+                    placeholder="https://your-proxy-server.com"
+                    value={formData.proxyUrl || ''}
+                    onChange={e => setFormData(prev => ({ ...prev, proxyUrl: e.target.value }))}
+                  />
+                  <p className="text-muted-foreground text-xs">可选的代理服务器地址，用于访问 AI 服务</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="apiKey">API 密钥</Label>
+                  <Input
+                    id="apiKey"
+                    type="password"
+                    placeholder="输入 API 密钥（可选）"
+                    value={formData.apiKey || ''}
+                    onChange={e => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
+                  />
+                  <p className="text-muted-foreground text-xs">用于访问特定 Embedding 模型的 API 密钥，如果模型需要的话</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

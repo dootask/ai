@@ -2,12 +2,12 @@
 
 import { Badge } from '@/components/ui/badge';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppContext } from '@/contexts/app-context';
+import { embeddingModels } from '@/lib/ai';
 import { agentsApi } from '@/lib/api/agents';
 import { knowledgeBasesApi } from '@/lib/api/knowledge-bases';
 import { Agent, KnowledgeBase, KnowledgeBaseDocument } from '@/lib/types';
@@ -25,7 +26,6 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { embeddingModels } from '@/lib/ai';
 
 export default function KnowledgeBaseDetailPage() {
   const params = useParams();
@@ -334,6 +334,50 @@ export default function KnowledgeBaseDetailPage() {
                 knowledgeBase.embedding_model}
             </div>
             <p className="text-muted-foreground text-sm">Embedding 模型</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">API 密钥</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-semibold">
+              {knowledgeBase.api_key ? (
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm">••••••••••••••••</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      try {
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                          navigator.clipboard.writeText(knowledgeBase.api_key || '');
+                          toast.success('API 密钥已复制到剪贴板');
+                        } else {
+                          // 降级方案：使用传统的复制方法
+                          const textArea = document.createElement('textarea');
+                          textArea.value = knowledgeBase.api_key || '';
+                          document.body.appendChild(textArea);
+                          textArea.select();
+                          document.execCommand('copy');
+                          document.body.removeChild(textArea);
+                          toast.success('API 密钥已复制到剪贴板');
+                        }
+                      } catch (error) {
+                        console.error('复制失败:', error);
+                        toast.error('复制失败，请手动复制');
+                      }
+                    }}
+                  >
+                    <FileText className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <span className="text-muted-foreground">未设置</span>
+              )}
+            </div>
+            <p className="text-muted-foreground text-sm">用于访问 Embedding 模型</p>
           </CardContent>
         </Card>
 

@@ -1,4 +1,4 @@
--- Description: 为消息表添加状态字段
+-- Description: 为AI模型表添加状态字段
 -- 添加状态字段到ai_models表，用于判断model是否思考型: 0否 1是, 默认0
 
 DO $$

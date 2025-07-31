@@ -224,6 +224,9 @@ export interface KnowledgeBase {
   embedding_model: string; // 后端字段名
   chunk_size: number;
   chunk_overlap: number;
+  api_key?: string | null; // 后端字段名
+  provider: string; // 新增
+  proxy_url?: string | null; // 新增
   metadata: unknown; // JSONB字段
   is_active: boolean; // 后端字段名
   created_at: string; // 后端字段名
@@ -250,6 +253,9 @@ export interface CreateKnowledgeBaseRequest {
   embedding_model: string; // 后端字段名
   chunk_size?: number;
   chunk_overlap?: number;
+  api_key?: string | null; // 后端字段名
+  provider: string; // 新增：必填
+  proxy_url?: string | null; // 新增：非必填
   metadata?: string; // JSON字符串
 }
 

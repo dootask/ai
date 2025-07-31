@@ -6,6 +6,7 @@ import (
 	"dootask-ai/go-service/routes/api/agents"
 	aimodels "dootask-ai/go-service/routes/api/ai-models"
 	"dootask-ai/go-service/routes/api/conversations"
+	knowledgebases "dootask-ai/go-service/routes/api/knowledge-bases"
 	"dootask-ai/go-service/utils"
 	"encoding/json"
 	"errors"
@@ -344,8 +345,8 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		"prompt":      agent.Prompt,
 		"spicy_level": 0,
 	}
-	if aiModel.IsThinking {
-		agentConfig["temperature"] = 0.0
+	if !aiModel.IsThinking {
+		agentConfig["temperature"] = aiModel.Temperature
 	}
 
 	threadId := fmt.Sprintf("%d_%d", req.DialogId, req.SessionId)
@@ -356,6 +357,32 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 	text := h.buildUserMessage(req)
 	if text == "" {
 		return nil, errors.New("用户消息为空")
+	}
+
+	var (
+		path      = "/stream"
+		ragConfig = []map[string]any{}
+		useRag    = false
+	)
+
+	if agent.KnowledgeBases != nil {
+		var kbs []knowledgebases.KnowledgeBase
+		var kbIds []int64
+		json.Unmarshal([]byte(agent.KnowledgeBases), &kbIds)
+		global.DB.Where("id in (?) AND is_active = ?", kbIds, true).Find(&kbs)
+		if len(kbs) > 0 {
+			useRag = true
+			path = "/rag_agent/stream"
+			for _, kb := range kbs {
+				ragConfig = append(ragConfig, map[string]any{
+					"api_key":        kb.ApiKey,
+					"model":          kb.EmbeddingModel,
+					"provider":       kb.Provider,
+					"proxy_url":      kb.ProxyURL,
+					"knowledge_base": []string{kb.Name},
+				})
+			}
+		}
 	}
 
 	// 发送POST请求获取流式响应
@@ -369,7 +396,11 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		"stream_tokens": true,
 	}
 
-	resp, err := httpClient.Stream(context.Background(), "/stream", nil, nil, http.MethodPost, data, "application/json")
+	if useRag {
+		data["rag_config"] = ragConfig
+	}
+
+	resp, err := httpClient.Stream(context.Background(), path, nil, nil, http.MethodPost, data, "application/json")
 	if err != nil {
 		return nil, errors.New("请求AI失败")
 	}
