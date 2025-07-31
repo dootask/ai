@@ -97,32 +97,6 @@ def load_postgres_vectorstore(knowledge_base: list[str] = ["default_knowledge_ba
         retrievers.append(retriever)
     lotr = MergerRetriever(retrievers=retrievers)
     return lotr
-    # async def _run():
-    #     async def search_one(collection: str):
-    #         vs = PGVector(
-    #             collection_name=collection,
-    #             connection=connection_string,
-    #             embeddings=embeddings,
-    #             async_mode=True
-    #         )
-    #         docs = await vs.as_retriever(search_kwargs={"k": 3}).ainvoke(query)
-    #         return [doc.page_content for doc in docs]
-
-    #     results = await asyncio.gather(*[search_one(c) for c in knowledge_base])
-    #     merged = "\n\n".join([f"source: <<{c}>>\n" + "\n".join(r) for c, r in zip(knowledge_base, results)])
-    #     # print(merged)
-    #     return merged
-
-    # # 在同步函数里跑协程
-    # try:
-    #     loop = asyncio.get_running_loop()
-    # except RuntimeError:
-    #     loop = None
-    # if loop and loop.is_running():
-    #     return loop.create_task(_run())
-    # else:
-    #     return asyncio.run(_run())    
-
 
 
 def database_search_func(query: str, config: RunnableConfig ) -> str:
