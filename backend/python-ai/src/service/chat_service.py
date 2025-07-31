@@ -66,11 +66,11 @@ class ChatService:
         if user_input.mcp_config:
             configurable["mcp_config"] = json.dumps(user_input.mcp_config)
         if user_input.rag_config:
-            if not user_input.rag_config.get("knowledge_base") or len(user_input.rag_config.get("knowledge_base") or []) > 3:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"knowledge_base only supports 3 at most",
-                )
+            # if not user_input.rag_config.get("knowledge_base") or len(user_input.rag_config.get("knowledge_base") or []) > 3:
+            #     raise HTTPException(
+            #         status_code=422,
+            #         detail=f"knowledge_base only supports 3 at most",
+            #     )
             configurable["rag_config"] = json.dumps(user_input.rag_config)
 
         config = RunnableConfig(

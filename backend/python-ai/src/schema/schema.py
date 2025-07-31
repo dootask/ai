@@ -120,17 +120,17 @@ class UserInput(BaseModel):
             }
         ],
     )
-    rag_config: dict[str, Any] = Field(
+    rag_config: list[dict[str, Any]] = Field(
         description = "rag agent request parameters",
         default={},
         examples=[
-            {
+            [{
                 "knowledge_base": ["default_knowledge_base","devops_doc"],
                 "provider": "openai",
                 "model": "text-embedding-3-small",
                 "api_key": "xxxxxxx",
                 "proxy_url": "http://proxy.com"
-            }
+            }]
         ]
     )
 
