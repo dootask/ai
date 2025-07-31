@@ -41,7 +41,7 @@ def get_postgres_connection_string() -> str:
     return f"postgresql+psycopg://{settings.POSTGRES_USER}:{password}@{settings.POSTGRES_HOST}:{port}/{settings.POSTGRES_DB}"
 
 
-def load_postgres_vectorstore(knowledge_base: list[str] = ["default_knowledge_base"], rag_config: list = None):
+def load_postgres_vectorstore(rag_config: list = None):
     """加载PostgreSQL向量存储"""
     # 获取PostgreSQL连接字符串
     connection_string = get_postgres_connection_string()
@@ -61,8 +61,10 @@ def load_postgres_vectorstore(knowledge_base: list[str] = ["default_knowledge_ba
                 embeddings = get_embeddings_by_provider(provider, model, json.dumps(_config))
             except Exception as e:
                 raise RuntimeError( "初始化Embeddings失败。请确保已设置相应的API密钥。" ) from e
-
+            knowledge_base = config.get("knowledge_base",["default_knowledge_base"])
+            # print('1-------->',knowledge_base)
             for item in knowledge_base:
+                # print(item)
                 # 创建PGVector实例
                 vectorstore = PGVector(
                     embeddings=embeddings,
@@ -134,10 +136,10 @@ async def retrieve_documents(state: AgentState, config: RunnableConfig) -> Agent
         configurable = config.get("configurable").get("rag_config")
         configurable = json.loads(configurable) if configurable else []
         # 获取PostgreSQL检索器
-        retriever = load_postgres_vectorstore(knowledge_base=configurable.get("knowledge_base"), rag_config=configurable)
+        retriever = load_postgres_vectorstore(rag_config=configurable)
         # Retrieve documents
         retrieved_docs = await retriever.ainvoke(query)
-        # print(retrieved_docs)
+        # print("-------------->",retrieved_docs)
         # Create document summaries for the state
         document_summaries = []
         for i, doc in enumerate(retrieved_docs, 1):

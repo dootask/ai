@@ -120,7 +120,7 @@ class UserInput(BaseModel):
             }
         ],
     )
-    rag_config: dict[str, Any] = Field(
+    rag_config: list[dict[str, Any]] = Field(
         description = "rag agent request parameters",
         default={},
         examples=[
