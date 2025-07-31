@@ -272,6 +272,7 @@ export interface UploadDocumentRequest {
 export interface MCPTool {
   id: string;
   name: string;
+  mcpName: string; // 新增：MCP工具标识
   description: string;
   category: 'dootask' | 'external' | 'custom';
   type: 'internal' | 'external';
@@ -280,6 +281,12 @@ export interface MCPTool {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  // 前端扩展字段（从config中提取）
+  apiKey?: string;
+  baseUrl?: string;
+  // 新增：配置方式
+  configType?: 'url' | 'npx';
+  npxConfig?: string;
   statistics?: MCPToolStatistics;
 }
 
@@ -292,6 +299,7 @@ export interface MCPToolStatistics {
 
 export interface CreateMCPToolRequest {
   name: string;
+  mcp_name: string; // 修复：使用后端字段名mcp_name
   description: string;
   category: 'dootask' | 'external' | 'custom';
   type: 'internal' | 'external';

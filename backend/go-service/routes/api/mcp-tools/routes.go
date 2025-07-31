@@ -187,6 +187,25 @@ func CreateMCPTool(c *gin.Context) {
 		return
 	}
 
+	// 检查MCP工具标识是否已存在
+	if req.McpName != "" {
+		if err := global.DB.Where("user_id = ? AND mcp_name = ?", global.DooTaskUser.UserID, req.McpName).First(&existingTool).Error; err == nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{
+				"code":    "MCP_TOOL_003",
+				"message": "MCP工具标识已存在",
+				"data":    nil,
+			})
+			return
+		} else if err != gorm.ErrRecordNotFound {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    "DATABASE_001",
+				"message": "检查MCP工具标识失败",
+				"data":    nil,
+			})
+			return
+		}
+	}
+
 	// 处理JSONB字段默认值
 	if req.Config == nil {
 		req.Config = []byte("{}")
@@ -199,6 +218,7 @@ func CreateMCPTool(c *gin.Context) {
 	tool := MCPTool{
 		UserID:      int64(global.DooTaskUser.UserID),
 		Name:        req.Name,
+		McpName:     req.McpName, // 新增：MCP工具标识
 		Description: req.Description,
 		Category:    req.Category,
 		Type:        req.Type,
@@ -343,10 +363,33 @@ func UpdateMCPTool(c *gin.Context) {
 		}
 	}
 
+	// 检查MCP工具标识是否已被其他工具使用
+	if req.McpName != nil && *req.McpName != tool.McpName {
+		var existingTool MCPTool
+		if err := global.DB.Where("user_id = ? AND mcp_name = ? AND id != ?", global.DooTaskUser.UserID, *req.McpName, id).First(&existingTool).Error; err == nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{
+				"code":    "MCP_TOOL_003",
+				"message": "MCP工具标识已存在",
+				"data":    nil,
+			})
+			return
+		} else if err != gorm.ErrRecordNotFound {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    "DATABASE_001",
+				"message": "检查MCP工具标识失败",
+				"data":    nil,
+			})
+			return
+		}
+	}
+
 	// 构建更新数据
 	updates := make(map[string]interface{})
 	if req.Name != nil {
 		updates["name"] = *req.Name
+	}
+	if req.McpName != nil {
+		updates["mcp_name"] = *req.McpName
 	}
 	if req.Description != nil {
 		updates["description"] = *req.Description

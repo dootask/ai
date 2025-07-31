@@ -1,12 +1,12 @@
 import axiosInstance from '@/lib/axios';
 import type {
-  CreateMCPToolRequest,
-  MCPTool,
-  MCPToolFilters,
-  MCPToolListData,
-  PaginationRequest,
-  PaginationResponse,
-  UpdateMCPToolRequest,
+    CreateMCPToolRequest,
+    MCPTool,
+    MCPToolFilters,
+    MCPToolListData,
+    PaginationRequest,
+    PaginationResponse,
+    UpdateMCPToolRequest,
 } from '@/lib/types';
 
 // MCP工具查询参数（保留兼容性）
@@ -66,35 +66,55 @@ interface MCPToolResponse {
   average_response_time?: number;
   success_rate?: number;
   associated_agents?: number;
+  mcp_name?: string; // 新增：MCP工具标识
 }
 
 // 前端表单数据类型
 interface MCPToolFormData {
   name: string;
+  mcpName: string; // 新增：MCP工具标识
   description?: string;
   category: 'dootask' | 'external' | 'custom';
   type: 'internal' | 'external';
   config?: Record<string, unknown>;
   permissions?: string[];
   isActive?: boolean;
-  // 用于前端表单的辅助字段
+  // 配置方式
+  configType: 'url' | 'npx'; // 新增：配置方式
+  // 用于前端表单的辅助字段（URL方式）
   apiKey?: string;
   baseUrl?: string;
+  // 用于前端表单的辅助字段（NPX方式）
+  npxConfig?: string; // 新增：NPX配置JSON字符串
 }
 
 // 数据转换函数：后端格式 → 前端格式
 const transformToFrontendFormat = (tool: MCPToolResponse): MCPTool => {
+  // 从config中提取apiKey和baseUrl
+  const config = tool.config || {};
+  
+  // 判断配置方式
+  const hasApiKey = config.apiKey && config.baseUrl;
+  const configType = hasApiKey ? 'url' : 'npx';
+  
   return {
     id: tool.id.toString(), // 转换为string类型
     name: tool.name,
+    mcpName: tool.mcp_name || '', // 新增：MCP工具标识
     description: tool.description || '',
     category: tool.category,
     type: tool.type,
-    config: tool.config,
+    config: config,
     permissions: tool.permissions,
     isActive: tool.is_active, // 转换字段名
     createdAt: tool.created_at, // 转换字段名
     updatedAt: tool.updated_at, // 转换字段名
+    // 配置方式
+    configType: configType,
+    // 提取配置字段供前端使用
+    apiKey: (config.apiKey as string) || '',
+    baseUrl: (config.baseUrl as string) || '',
+    npxConfig: configType === 'npx' ? JSON.stringify(config, null, 2) : '',
     statistics:
       tool.total_calls !== undefined
         ? {
@@ -109,15 +129,52 @@ const transformToFrontendFormat = (tool: MCPToolResponse): MCPTool => {
 
 // 数据转换函数：前端格式 → 后端格式
 const transformToBackendFormat = (data: MCPToolFormData): CreateMCPToolRequest | UpdateMCPToolRequest => {
-  return {
+  let config: Record<string, unknown> = { ...data.config };
+  
+  if (data.configType === 'url') {
+    // URL方式：将apiKey和baseUrl合并到config中
+    if (data.apiKey) {
+      config.apiKey = data.apiKey;
+    }
+    if (data.baseUrl) {
+      config.baseUrl = data.baseUrl;
+    }
+  } else if (data.configType === 'npx') {
+    // NPX方式：解析JSON配置
+    try {
+      if (data.npxConfig) {
+        const parsedConfig = JSON.parse(data.npxConfig);
+        config = { ...config, ...parsedConfig };
+      }
+    } catch (error) {
+      console.error('NPX配置JSON解析失败:', error);
+      // 保持原有配置，不覆盖错误信息
+      if (data.config) {
+        config = { ...data.config };
+      }
+    }
+  }
+
+  // 构建基础请求对象
+  const baseRequest = {
     name: data.name,
-    description: data.description,
+    mcp_name: data.mcpName, // 修复：使用后端字段名mcp_name
+    description: data.description || '',
     category: data.category,
     type: data.type,
-    config: data.config || {},
+    config: config, // 使用合并后的config
     permissions: data.permissions || [],
-    isActive: data.isActive,
   };
+
+  // 如果是更新请求，添加isActive字段
+  if (data.isActive !== undefined) {
+    return {
+      ...baseRequest,
+      isActive: data.isActive,
+    } as UpdateMCPToolRequest;
+  }
+
+  return baseRequest as CreateMCPToolRequest;
 };
 
 // MCP工具管理API

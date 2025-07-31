@@ -10,6 +10,7 @@ type MCPTool struct {
 	ID          int64           `gorm:"primaryKey;autoIncrement" json:"id"`
 	UserID      int64           `gorm:"not null;index" json:"user_id"`
 	Name        string          `gorm:"type:varchar(255);not null;unique" json:"name" validate:"required,max=255"`
+	McpName     string          `gorm:"type:varchar(100);not null;default:''" json:"mcp_name"`
 	Description *string         `gorm:"type:text" json:"description"`
 	Category    string          `gorm:"type:varchar(50);not null;default:'external'" json:"category" validate:"required,oneof=dootask external custom"`
 	Type        string          `gorm:"type:varchar(20);not null;default:'external'" json:"type" validate:"required,oneof=internal external"`
@@ -28,6 +29,7 @@ func (MCPTool) TableName() string {
 // CreateMCPToolRequest 创建MCP工具请求
 type CreateMCPToolRequest struct {
 	Name        string          `json:"name" validate:"required,max=255"`
+	McpName     string          `json:"mcp_name" validate:"required,max=100,alphanum"`
 	Description *string         `json:"description"`
 	Category    string          `json:"category" validate:"required,oneof=dootask external custom"`
 	Type        string          `json:"type" validate:"required,oneof=internal external"`
@@ -38,6 +40,7 @@ type CreateMCPToolRequest struct {
 // UpdateMCPToolRequest 更新MCP工具请求
 type UpdateMCPToolRequest struct {
 	Name        *string         `json:"name" validate:"omitempty,max=255"`
+	McpName     *string         `json:"mcp_name" validate:"omitempty,max=100,alphanum"`
 	Description *string         `json:"description"`
 	Category    *string         `json:"category" validate:"omitempty,oneof=dootask external custom"`
 	Type        *string         `json:"type" validate:"omitempty,oneof=internal external"`

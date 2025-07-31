@@ -7,6 +7,7 @@ import (
 	aimodels "dootask-ai/go-service/routes/api/ai-models"
 	"dootask-ai/go-service/routes/api/conversations"
 	knowledgebases "dootask-ai/go-service/routes/api/knowledge-bases"
+	mcptools "dootask-ai/go-service/routes/api/mcp-tools"
 	"dootask-ai/go-service/utils"
 	"encoding/json"
 	"errors"
@@ -359,32 +360,6 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		return nil, errors.New("用户消息为空")
 	}
 
-	var (
-		path      = "/stream"
-		ragConfig = []map[string]any{}
-		useRag    = false
-	)
-
-	if agent.KnowledgeBases != nil {
-		var kbs []knowledgebases.KnowledgeBase
-		var kbIds []int64
-		json.Unmarshal([]byte(agent.KnowledgeBases), &kbIds)
-		global.DB.Where("id in (?) AND is_active = ?", kbIds, true).Find(&kbs)
-		if len(kbs) > 0 {
-			useRag = true
-			path = "/rag_agent/stream"
-			for _, kb := range kbs {
-				ragConfig = append(ragConfig, map[string]any{
-					"api_key":        kb.ApiKey,
-					"model":          kb.EmbeddingModel,
-					"provider":       kb.Provider,
-					"proxy_url":      kb.ProxyURL,
-					"knowledge_base": []string{kb.Name},
-				})
-			}
-		}
-	}
-
 	// 发送POST请求获取流式响应
 	data := map[string]any{
 		"message":       text,
@@ -396,8 +371,48 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		"stream_tokens": true,
 	}
 
-	if useRag {
-		data["rag_config"] = ragConfig
+	var (
+		path      = "/stream"
+		ragConfig = []map[string]any{}
+		mcpConfig = map[string]any{}
+	)
+
+	// 检查是否使用RAG
+	if agent.KnowledgeBases != nil {
+		var kbs []knowledgebases.KnowledgeBase
+		var kbIds []int64
+		json.Unmarshal([]byte(agent.KnowledgeBases), &kbIds)
+		global.DB.Where("id in (?) AND is_active = ?", kbIds, true).Find(&kbs)
+		if len(kbs) > 0 {
+			path = "/rag_agent/stream"
+			for _, kb := range kbs {
+				ragConfig = append(ragConfig, map[string]any{
+					"api_key":        kb.ApiKey,
+					"model":          kb.EmbeddingModel,
+					"provider":       kb.Provider,
+					"proxy_url":      kb.ProxyURL,
+					"knowledge_base": []string{kb.Name},
+				})
+			}
+			data["rag_config"] = ragConfig
+		}
+	}
+
+	// 检查是否使用MCP
+	if agent.Tools != nil {
+		var mcpTools []mcptools.MCPTool
+		var mcpToolIds []int64
+		json.Unmarshal([]byte(agent.Tools), &mcpToolIds)
+		global.DB.Where("id in (?) AND is_active = ?", mcpToolIds, true).Find(&mcpTools)
+		if len(mcpTools) > 0 {
+			path = "/mcp_agent/stream"
+			for _, mcpTool := range mcpTools {
+				var config map[string]any
+				json.Unmarshal(mcpTool.Config, &config)
+				mcpConfig[mcpTool.McpName] = config
+			}
+			data["mcp_config"] = mcpConfig
+		}
 	}
 
 	resp, err := httpClient.Stream(context.Background(), path, nil, nil, http.MethodPost, data, "application/json")

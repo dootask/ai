@@ -15,18 +15,26 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { toolCategories, toolPermissions, toolTypes } from '@/lib/ai';
 import { mcpToolsApi, type MCPToolFormData } from '@/lib/api/mcp-tools';
-import { CreateMCPToolRequest } from '@/lib/types';
 import { ExternalLink, Key, Save, Settings, Shield, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { toolCategories, toolPermissions, toolTypes } from '@/lib/ai';
 
-interface FormData extends CreateMCPToolRequest {
+interface FormData {
+  name: string;
+  mcp_name: string; // 修复：使用后端字段名mcp_name
+  description?: string;
+  category: 'dootask' | 'external' | 'custom';
+  type: 'internal' | 'external';
+  config: Record<string, unknown>;
+  permissions: string[];
+  configType: 'url' | 'npx'; // 新增：配置方式
   apiKey?: string;
   baseUrl?: string;
+  npxConfig?: string; // 新增：NPX配置
 }
 
 export default function EditMCPToolPage() {
@@ -36,13 +44,16 @@ export default function EditMCPToolPage() {
   const [loading, setLoading] = useState(true);
   const [formData, setFormData] = useState<FormData>({
     name: '',
+    mcp_name: '', // 新增：MCP工具标识
     description: '',
     category: 'external',
     type: 'external',
     config: {},
     permissions: ['read'],
+    configType: 'url', // 新增：默认URL方式
     apiKey: '',
     baseUrl: '',
+    npxConfig: '', // 新增：NPX配置
   });
 
   useEffect(() => {
@@ -54,13 +65,16 @@ export default function EditMCPToolPage() {
 
         setFormData({
           name: tool.name || '',
+          mcp_name: tool.mcpName || '', // 新增：MCP工具标识
           description: tool.description || '',
           category: tool.category || 'external',
           type: tool.type || 'external',
           config: tool.config || {},
           permissions: tool.permissions || ['read'],
-          apiKey: ((tool.config as Record<string, unknown>)?.apiKey as string) || '',
-          baseUrl: ((tool.config as Record<string, unknown>)?.baseUrl as string) || '',
+          configType: tool.configType || 'url', // 新增：配置方式
+          apiKey: tool.apiKey || '', // 使用转换后的字段
+          baseUrl: tool.baseUrl || '', // 使用转换后的字段
+          npxConfig: tool.npxConfig || '', // 新增：NPX配置
         });
       } catch (error) {
         console.error('Failed to load tool:', error);
@@ -75,8 +89,13 @@ export default function EditMCPToolPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || !formData.description.trim()) {
+    if (!formData.name.trim() || !formData.description?.trim()) {
       toast.error('请填写所有必填字段');
+      return;
+    }
+
+    if (!formData.mcp_name.trim()) {
+      toast.error('请填写MCP工具标识');
       return;
     }
 
@@ -85,28 +104,33 @@ export default function EditMCPToolPage() {
       return;
     }
 
+    // 验证NPX配置JSON格式
+    if (formData.configType === 'npx' && formData.npxConfig) {
+      try {
+        JSON.parse(formData.npxConfig);
+      } catch (error) {
+        console.error('NPX配置JSON格式错误:', error);
+        toast.error('NPX配置JSON格式错误，请检查语法');
+        return;
+      }
+    }
+
     setIsLoading(true);
 
     try {
-      // 构建配置对象
-      const config: Record<string, unknown> = {};
-      if (formData.type === 'external' && formData.baseUrl) {
-        config.baseUrl = formData.baseUrl;
-      }
-      if (formData.apiKey) {
-        config.apiKey = formData.apiKey;
-      }
-
-      // 使用真实API调用
+      // 构建表单数据用于API调用
       const toolFormData: MCPToolFormData = {
         name: formData.name,
+        mcpName: formData.mcp_name, // 新增：MCP工具标识
         description: formData.description || '',
         category: formData.category,
         type: formData.type,
-        config: formData.config,
+        config: formData.config, // 保持原config，让转换函数处理
         permissions: formData.permissions,
+        configType: formData.configType, // 新增：配置方式
         apiKey: formData.apiKey,
         baseUrl: formData.baseUrl,
+        npxConfig: formData.npxConfig, // 新增：NPX配置
       };
 
       await mcpToolsApi.update(params.id as string, toolFormData);
@@ -202,6 +226,22 @@ export default function EditMCPToolPage() {
                     />
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="mcpName">MCP工具标识 *</Label>
+                    <Input
+                      id="mcpName"
+                      placeholder="例如：weather-api"
+                      value={formData.mcp_name}
+                      onChange={e => setFormData(prev => ({ ...prev, mcp_name: e.target.value }))}
+                      pattern="[a-zA-Z0-9]+"
+                      title="仅限英文和数字"
+                      required
+                    />
+                    <p className="text-muted-foreground text-xs">仅限英文和数字，用于工具唯一标识</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
                     <Label htmlFor="category">工具类别 *</Label>
                     <CommandSelect
                       options={toolCategories.map(category => ({
@@ -218,9 +258,6 @@ export default function EditMCPToolPage() {
                       emptyMessage="没有找到相关类别"
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="type">工具类型 *</Label>
                     <CommandSelect
@@ -238,7 +275,6 @@ export default function EditMCPToolPage() {
                       emptyMessage="没有找到相关类型"
                     />
                   </div>
-                  <div className="space-y-2"></div>
                 </div>
 
                 <div className="space-y-2">
@@ -266,34 +302,116 @@ export default function EditMCPToolPage() {
                 <CardDescription>配置工具的连接参数</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {formData.type === 'external' && (
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <ExternalLink className="h-4 w-4" />
-                      API 基础 URL
-                    </Label>
-                    <Input
-                      placeholder="https://api.example.com/v1"
-                      value={formData.baseUrl}
-                      onChange={e => setFormData(prev => ({ ...prev, baseUrl: e.target.value }))}
-                    />
-                    <p className="text-muted-foreground text-xs">外部 API 服务的基础地址</p>
+                {/* 配置方式选择 */}
+                <div className="space-y-2">
+                  <Label>配置方式 *</Label>
+                  <div className="flex gap-4">
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="config-url"
+                        name="configType"
+                        value="url"
+                        checked={formData.configType === 'url'}
+                        onChange={e => {
+                          const newConfigType = e.target.value as 'url' | 'npx';
+                          setFormData(prev => ({
+                            ...prev,
+                            configType: newConfigType,
+                            // 清空之前的配置
+                            apiKey: newConfigType === 'url' ? prev.apiKey : '',
+                            baseUrl: newConfigType === 'url' ? prev.baseUrl : '',
+                            npxConfig: newConfigType === 'npx' ? prev.npxConfig : '',
+                          }));
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="config-url" className="text-sm font-normal">URL方式</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="config-npx"
+                        name="configType"
+                        value="npx"
+                        checked={formData.configType === 'npx'}
+                        onChange={e => {
+                          const newConfigType = e.target.value as 'url' | 'npx';
+                          setFormData(prev => ({
+                            ...prev,
+                            configType: newConfigType,
+                            // 清空之前的配置
+                            apiKey: newConfigType === 'url' ? prev.apiKey : '',
+                            baseUrl: newConfigType === 'url' ? prev.baseUrl : '',
+                            npxConfig: newConfigType === 'npx' ? prev.npxConfig : '',
+                          }));
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="config-npx" className="text-sm font-normal">NPX方式</Label>
+                    </div>
                   </div>
+                  <p className="text-muted-foreground text-xs">
+                    URL方式：通过HTTP API调用 | NPX方式：通过本地NPX包调用
+                  </p>
+                </div>
+
+                {/* URL方式配置 */}
+                {formData.configType === 'url' && (
+                  <>
+                    {formData.type === 'external' && (
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <ExternalLink className="h-4 w-4" />
+                          API 基础 URL
+                        </Label>
+                        <Input
+                          placeholder="https://api.example.com/v1"
+                          value={formData.baseUrl}
+                          onChange={e => setFormData(prev => ({ ...prev, baseUrl: e.target.value }))}
+                        />
+                        <p className="text-muted-foreground text-xs">外部 API 服务的基础地址</p>
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <Key className="h-4 w-4" />
+                        API Key / 访问令牌
+                      </Label>
+                      <Input
+                        type="password"
+                        placeholder="sk-... 或其他访问令牌"
+                        value={formData.apiKey}
+                        onChange={e => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
+                      />
+                      <p className="text-muted-foreground text-xs">用于访问 API 的密钥或令牌</p>
+                    </div>
+                  </>
                 )}
 
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Key className="h-4 w-4" />
-                    API Key / 访问令牌
-                  </Label>
-                  <Input
-                    type="password"
-                    placeholder="sk-... 或其他访问令牌"
-                    value={formData.apiKey}
-                    onChange={e => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
-                  />
-                  <p className="text-muted-foreground text-xs">用于访问 API 的密钥或令牌</p>
-                </div>
+                {/* NPX方式配置 */}
+                {formData.configType === 'npx' && (
+                  <div className="space-y-2">
+                    <Label>NPX配置 (JSON格式) *</Label>
+                    <Textarea
+                      placeholder={`{
+  "command": "npx @modelcontextprotocol/server-filesystem@latest",
+  "args": ["--root", "/path/to/files"],
+  "env": {
+    "API_KEY": "your-api-key"
+  }
+}`}
+                      value={formData.npxConfig}
+                      onChange={e => setFormData(prev => ({ ...prev, npxConfig: e.target.value }))}
+                      rows={8}
+                      className="font-mono text-sm"
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      输入NPX工具的JSON配置，包含命令、参数和环境变量等
+                    </p>
+                  </div>
+                )}
 
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                   <div className="flex items-start gap-2">
