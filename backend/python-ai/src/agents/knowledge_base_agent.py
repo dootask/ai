@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from typing import Any
@@ -11,6 +12,11 @@ from langchain_core.runnables import (RunnableConfig, RunnableLambda,
 from langchain_core.runnables.base import RunnableSequence
 from langgraph.graph import END, MessagesState, StateGraph
 from langgraph.managed import RemainingSteps
+from langchain_postgres import PGVector
+from langchain_core.runnables import RunnableConfig
+from langchain.retrievers import MergerRetriever
+
+from core.embeddings import get_embeddings_by_provider
 
 logger = logging.getLogger(__name__)
 
@@ -24,27 +30,52 @@ class AgentState(MessagesState, total=False):
     kb_documents: str
 
 
-# Create the retriever
-def get_kb_retriever():
-    """Create and return a Knowledge Base retriever instance."""
-    # Get the Knowledge Base ID from environment
-    kb_id = os.environ.get("AWS_KB_ID", "")
-    if not kb_id:
-        raise ValueError("AWS_KB_ID environment variable must be set")
+def get_postgres_connection_string() -> str:
+    """获取PostgreSQL连接字符串"""
+    if not all([settings.POSTGRES_HOST, settings.POSTGRES_USER, settings.POSTGRES_DB]):
+        raise ValueError("PostgreSQL配置不完整，请检查环境变量")
+    
+    password = settings.POSTGRES_PASSWORD.get_secret_value() if settings.POSTGRES_PASSWORD else ""
+    port = settings.POSTGRES_PORT or 5432
+    
+    return f"postgresql+psycopg://{settings.POSTGRES_USER}:{password}@{settings.POSTGRES_HOST}:{port}/{settings.POSTGRES_DB}"
 
-    # Create the retriever with the specified Knowledge Base ID
-    retriever = AmazonKnowledgeBasesRetriever(
-        knowledge_base_id=kb_id,
-        retrieval_config={
-            "vectorSearchConfiguration": {
-                "numberOfResults": 3,
+
+def load_postgres_vectorstore(knowledge_base: list[str] = ["default_knowledge_base"], embeddings_config: dict = None):
+    """加载PostgreSQL向量存储"""
+    try:
+        if embeddings_config:
+            # 使用传入的配置
+            provider = embeddings_config.get("provider", "openai")
+            model = embeddings_config.get("model", "text-embedding-3-small")
+            config = {
+                "api_key": embeddings_config.get("api_key"),
+                "proxy_url": embeddings_config.get("proxy_url"),
+                "dimensions": embeddings_config.get("dimensions", None)
             }
-        },
-    )
-    return retriever
+        embeddings = get_embeddings_by_provider(provider, model, json.dumps(config))
+    except Exception as e:
+        raise RuntimeError( "初始化Embeddings失败。请确保已设置相应的API密钥。" ) from e
+
+    # 获取PostgreSQL连接字符串
+    connection_string = get_postgres_connection_string()
+    retrievers = []
+    for item in knowledge_base:
+        # 创建PGVector实例
+        vectorstore = PGVector(
+            embeddings=embeddings,
+            connection=connection_string,
+            collection_name=item,
+            use_jsonb=True,
+            async_mode=True
+        )
+        retriever = vectorstore.as_retriever(search_kwargs={"k": 1})
+        retrievers.append(retriever)
+    lotr = MergerRetriever(retrievers=retrievers)
+    return lotr
 
 
-def wrap_model(model: BaseChatModel) -> RunnableSerializable[AgentState, AIMessage]:
+def wrap_model(model: BaseChatModel, prompt: str | None) -> RunnableSerializable[AgentState, AIMessage]:
     """Wrap the model with a system prompt for the Knowledge Base agent."""
 
     def create_system_message(state):
@@ -62,7 +93,8 @@ def wrap_model(model: BaseChatModel) -> RunnableSerializable[AgentState, AIMessa
 
         Format your response in a clear, conversational manner. Use markdown formatting when appropriate.
         """
-
+        if prompt:
+            base_prompt = prompt
         # Check if documents were retrieved
         if "kb_documents" in state:
             # Append document information to the system prompt
@@ -97,20 +129,21 @@ async def retrieve_documents(state: AgentState, config: RunnableConfig) -> Agent
 
     try:
         # Initialize the retriever
-        retriever = get_kb_retriever()
-
+        configurable = config.get("configurable").get("rag_config")
+        configurable = json.loads(configurable) if configurable else {}
+        # 获取PostgreSQL检索器
+        retriever = load_postgres_vectorstore(knowledge_base=configurable.get("knowledge_base"), embeddings_config=configurable)
         # Retrieve documents
         retrieved_docs = await retriever.ainvoke(query)
-
+        # print(retrieved_docs)
         # Create document summaries for the state
         document_summaries = []
         for i, doc in enumerate(retrieved_docs, 1):
             summary = {
-                "id": doc.metadata.get("id", f"doc-{i}"),
+                "id": doc.id,
                 "source": doc.metadata.get("source", "Unknown"),
-                "title": doc.metadata.get("title", f"Document {i}"),
+                "title": doc.metadata.get("filename", f"Document {i}"),
                 "content": doc.page_content,
-                "relevance_score": doc.metadata.get("score", 0),
             }
             document_summaries.append(summary)
 
@@ -152,13 +185,14 @@ async def prepare_augmented_prompt(
 
 async def acall_model(state: AgentState, config: RunnableConfig) -> AgentState:
     """Generate a response based on the retrieved documents."""
+    configurable = config.get("configurable",{})
     m = get_model_by_provider(
-        config.get("configurable",{}).get("provider"),
-        config.get("configurable",{}).get("model", settings.DEFAULT_MODEL),
-        config.get("configurable",{}).get("agent_config", None),
+        configurable.get("provider"),
+        configurable.get("model", settings.DEFAULT_MODEL),
+        configurable.get("agent_config", None),
     )
-    model_runnable = wrap_model(m)
-
+    agent_config = json.loads(configurable.get("agent_config", None)) if configurable.get("agent_config", None) else {}
+    model_runnable = wrap_model(m,agent_config.get("prompt"))
     response = await model_runnable.ainvoke(state, config)
 
     return {"messages": [response]}

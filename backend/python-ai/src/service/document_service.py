@@ -1,3 +1,4 @@
+import json
 import os
 import tempfile
 from uuid import uuid4
@@ -46,7 +47,8 @@ class DocumentService:
     def get_vectorstore(self, provider="openai", model="text-embedding-3-small", config=None, collection_name: str = "default_knowledge_base") -> PGVector:
         """获取向量存储实例"""
         connection_string = self.get_postgres_connection_string()
-        embeddings = get_embeddings_by_provider(provider, model, tuple(sorted(config.items())))
+
+        embeddings = get_embeddings_by_provider(provider, model, json.dumps(config))
         
         return PGVector(
             embeddings=embeddings,

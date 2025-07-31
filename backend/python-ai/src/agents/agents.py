@@ -33,10 +33,10 @@ agents: dict[str, Agent] = {
     #     description="A research assistant with web search and calculator.",
     #     graph=research_assistant,
     # ),
-    "rag_agent": Agent(
-        description="A RAG assistant with access to information in a database.",
-        graph=rag_assistant,
-    ),
+    # "rag_agent": Agent(
+    #     description="A RAG assistant with access to information in a database.",
+    #     graph=rag_assistant,
+    # ),
     "mcp_agent": Agent(description="A mcp agent.", graph=mcp_agent),
     "command-agent": Agent(description="A command agent.", graph=command_agent),
     "bg-task-agent": Agent(description="A background task agent.", graph=bg_task_agent),
@@ -46,8 +46,8 @@ agents: dict[str, Agent] = {
     "interrupt-agent": Agent(
         description="An agent the uses interrupts.", graph=interrupt_agent
     ),
-    "knowledge-base-agent": Agent(
-        description="A retrieval-augmented generation agent using Amazon Bedrock Knowledge Base",
+    "rag_agent": Agent(
+        description="A retrieval-augmented generation agent using pg Knowledge Base",
         graph=kb_agent,
     ),
 }
