@@ -508,7 +508,7 @@ func DeleteKnowledgeBase(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "KB_003",
 			"message": "知识库正在被智能体使用，无法删除",
-			"data": map[string]interface{}{
+			"data": map[string]any{
 				"usage_count": agentCount,
 			},
 		})
@@ -664,7 +664,6 @@ func ListDocuments(c *gin.Context) {
 
 	var documents []KBDocument
 	if err := query.
-		Select("kb_documents.*, (SELECT COUNT(*) FROM kb_documents child WHERE child.parent_doc_id = kb_documents.id AND child.is_active = true) as chunks_count").
 		Order(orderBy).
 		Limit(req.PageSize).
 		Offset(req.GetOffset()).
@@ -677,14 +676,8 @@ func ListDocuments(c *gin.Context) {
 		return
 	}
 
-	// 设置处理状态
-	for i := range documents {
-		if documents[i].ChunkIndex > 0 {
-			documents[i].ChunksCount = documents[i].ChunkIndex
-			documents[i].ProcessStatus = "processed"
-		} else {
-			documents[i].ProcessStatus = "processing"
-		}
+	for i, doc := range documents {
+		documents[i].ChunksCount = doc.ChunkIndex
 	}
 
 	// 构造响应数据
@@ -805,6 +798,8 @@ func UploadDocument(c *gin.Context) {
 		fileExt := getFileExtension(doc.FileType)
 		tmpFile, err := os.CreateTemp("", "upload_*"+fileExt)
 		if err != nil {
+			// 更新文档状态为处理失败
+			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
 			fmt.Printf("创建临时文件失败: %v\n", err)
 			return
 		}
@@ -813,6 +808,8 @@ func UploadDocument(c *gin.Context) {
 
 		// 写入文件内容
 		if _, err := tmpFile.WriteString(doc.Content); err != nil {
+			// 更新文档状态为处理失败
+			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
 			fmt.Printf("写入临时文件失败: %v\n", err)
 			return
 		}
@@ -830,39 +827,47 @@ func UploadDocument(c *gin.Context) {
 		)
 
 		if err != nil {
+			// 更新文档状态为处理失败
+			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
 			fmt.Printf("上传文档到AI服务失败: %v, doc_id: %d\n", err, doc.ID)
 			return
 		}
 
 		if response.StatusCode != http.StatusOK {
+			// 更新文档状态为处理失败
+			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
 			fmt.Printf("AI服务返回错误: status=%d, body=%s\n", response.StatusCode, string(response.Body))
 			return
 		}
 
 		var uploadDocumentResponse UploadDocumentResponse
 		if err := json.Unmarshal(response.Body, &uploadDocumentResponse); err != nil {
+			// 更新文档状态为处理失败
+			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
 			fmt.Printf("解析上传文档响应失败: %v\n", err)
 			return
 		}
 
 		if len(uploadDocumentResponse.ProcessedFiles) == 0 {
+			// 更新文档状态为处理失败
+			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
 			fmt.Printf("上传文档到AI服务成功: %v, doc_id: %d\n", uploadDocumentResponse, doc.ID)
 			return
 		}
 
 		for _, file := range uploadDocumentResponse.ProcessedFiles {
 			if file.Status == "success" {
-				// 更新文档状态为处理中
-				global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("chunk_index", file.Chunks)
+				// 更新文档状态为已处理
+				global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Updates(map[string]interface{}{
+					"chunk_index": file.Chunks,
+					"status":      "processed",
+				})
 			} else {
-				fmt.Printf("上传文档到AI服务失败: %v, doc_id: %d\n", file, doc.ID)
+				// 更新文档状态为处理失败
+				global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
 			}
 		}
 	}(uploadedDocs[0])
-
-	// 设置处理状态
-	uploadedDocs[0].ProcessStatus = "processing"
-	uploadedDocs[0].ChunkIndex = 0
 
 	c.JSON(http.StatusOK, uploadedDocs[0])
 }

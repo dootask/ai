@@ -38,7 +38,7 @@ type KBDocument struct {
 	Metadata        json.RawMessage `gorm:"type:jsonb;default:'{}'" json:"metadata"`
 	ChunkIndex      int             `gorm:"default:0" json:"chunk_index"`
 	ParentDocID     *int64          `gorm:"column:parent_doc_id" json:"parent_doc_id"`
-	ProcessStatus   string          `gorm:"-" json:"status"` // 处理状态：processed, processing, failed
+	Status          string          `gorm:"type:varchar(20);default:'processing'" json:"status"`
 	IsActive        bool            `gorm:"default:true" json:"is_active"`
 	CreatedAt       time.Time       `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt       time.Time       `gorm:"autoUpdateTime" json:"updated_at"`
