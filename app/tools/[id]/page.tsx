@@ -2,12 +2,12 @@
 
 import { Badge } from '@/components/ui/badge';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -264,6 +264,10 @@ export default function MCPToolDetailPage() {
                   <p className="text-sm">{tool.name}</p>
                 </div>
                 <div>
+                  <h4 className="text-muted-foreground text-sm font-medium">MCP工具标识</h4>
+                  <p className="text-sm font-mono">{tool.mcpName || '-'}</p>
+                </div>
+                <div>
                   <h4 className="text-muted-foreground text-sm font-medium">工具类别</h4>
                   <div className="flex items-center gap-2">
                     <div className={`h-3 w-3 rounded-full ${currentCategory.color}`}></div>
@@ -303,31 +307,63 @@ export default function MCPToolDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {tool.type === 'external' && Boolean(tool.config.baseUrl) && (
-                <div>
-                  <h4 className="text-muted-foreground mb-2 text-sm font-medium">API 基础地址</h4>
-                  <div className="flex items-center gap-2">
-                    <ExternalLink className="text-muted-foreground h-4 w-4" />
-                    <p className="font-mono text-sm break-all">{safeString(tool.config.baseUrl)}</p>
+              {/* 配置类型 */}
+              <div>
+                <h4 className="text-muted-foreground mb-2 text-sm font-medium">配置类型</h4>
+                <Badge variant="outline">
+                  {tool.configType === 1 ? 'NPX配置' : 'URL配置'}
+                </Badge>
+              </div>
+
+              {/* URL配置信息 */}
+              {tool.configType === 0 && (
+                <>
+                  {Boolean(tool.config?.baseUrl) && (
+                    <div>
+                      <h4 className="text-muted-foreground mb-2 text-sm font-medium">API 基础地址</h4>
+                      <div className="flex items-center gap-2">
+                        <ExternalLink className="text-muted-foreground h-4 w-4" />
+                        <p className="font-mono text-sm break-all">{safeString(tool.config.baseUrl)}</p>
+                      </div>
+                    </div>
+                  )}
+                  {Boolean(tool.config?.endpoint) && (
+                    <div>
+                      <h4 className="text-muted-foreground mb-2 text-sm font-medium">API 端点</h4>
+                      <p className="font-mono text-sm">{safeString(tool.config.endpoint)}</p>
+                    </div>
+                  )}
+                  {/* API密钥状态 - 只在URL配置时显示 */}
+                  <div>
+                    <h4 className="text-muted-foreground mb-2 text-sm font-medium">API 密钥</h4>
+                    <div className="flex items-center gap-2">
+                      <Key className="text-muted-foreground h-4 w-4" />
+                      <Badge variant={tool.configInfo?.hasApiKey ? 'default' : 'secondary'}>
+                        {tool.configInfo?.hasApiKey ? '已填写' : '未填写'}
+                      </Badge>
+                    </div>
                   </div>
-                </div>
+                </>
               )}
-              {Boolean(tool.config.apiKey) && (
-                <div>
-                  <h4 className="text-muted-foreground mb-2 text-sm font-medium">API 密钥</h4>
-                  <div className="flex items-center gap-2">
-                    <Key className="text-muted-foreground h-4 w-4" />
-                    <p className="font-mono text-sm">{'••••••••••••' + safeString(tool.config.apiKey).slice(-4)}</p>
+
+              {/* NPX配置信息 */}
+              {tool.configType === 1 && (
+                <>
+                  <div>
+                    <h4 className="text-muted-foreground mb-2 text-sm font-medium">NPX 配置</h4>
+                    <div className="rounded-md bg-muted p-3">
+                      <pre className="text-xs overflow-auto">
+                        {JSON.stringify(tool.config, null, 2)}
+                      </pre>
+                    </div>
                   </div>
-                </div>
+                </>
               )}
-              {Boolean(tool.config.endpoint) && (
-                <div>
-                  <h4 className="text-muted-foreground mb-2 text-sm font-medium">API 端点</h4>
-                  <p className="font-mono text-sm">{safeString(tool.config.endpoint)}</p>
-                </div>
+
+              {!tool.config?.baseUrl && !tool.config?.endpoint && 
+               (tool.configType !== 1 || Object.keys(tool.config || {}).length === 0) && (
+                <p className="text-muted-foreground text-sm">暂无配置信息</p>
               )}
-              {Object.keys(tool.config).length === 0 && <p className="text-muted-foreground text-sm">暂无配置信息</p>}
             </CardContent>
           </Card>
 

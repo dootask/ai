@@ -14,7 +14,7 @@ type KnowledgeBase struct {
 	EmbeddingModel string          `gorm:"type:varchar(100);default:'text-embedding-ada-002'" json:"embedding_model" validate:"required"`
 	ChunkSize      int             `gorm:"default:1000" json:"chunk_size" validate:"min=100,max=4000"`
 	ChunkOverlap   int             `gorm:"default:200" json:"chunk_overlap" validate:"min=0,max=1000"`
-	ApiKey         string          `gorm:"type:text" json:"api_key"`
+	ApiKey         string          `gorm:"type:text" json:"-"` // 不返回给前端
 	Provider       string          `gorm:"type:varchar(100);default:''" json:"provider"`
 	ProxyURL       string          `gorm:"type:varchar(500);default:''" json:"proxy_url"`
 	Metadata       json.RawMessage `gorm:"type:jsonb;default:'{}'" json:"metadata"`
@@ -23,7 +23,7 @@ type KnowledgeBase struct {
 	UpdatedAt      time.Time       `gorm:"autoUpdateTime" json:"updated_at"`
 
 	// 关联查询字段
-	DocumentsCount int `gorm:"column:documents_count" json:"documents_count"`
+	DocumentsCount int `gorm:"->:migration" json:"documents_count"`
 }
 
 // KBDocument 知识库文档模型

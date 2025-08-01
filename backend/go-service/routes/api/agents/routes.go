@@ -8,6 +8,8 @@ import (
 	"strconv"
 
 	"dootask-ai/go-service/global"
+	knowledgebases "dootask-ai/go-service/routes/api/knowledge-bases"
+	mcp "dootask-ai/go-service/routes/api/mcp-tools"
 	"dootask-ai/go-service/utils"
 
 	dootask "github.com/dootask/tools/server/go"
@@ -147,6 +149,19 @@ func ListAgents(c *gin.Context) {
 
 	// 查询统计信息
 	for i, agent := range agents {
+		// 查询知识库名称
+		var kbIDs []int64
+		var kbNames []string
+		json.Unmarshal(agent.KnowledgeBases, &kbIDs)
+		global.DB.Model(&knowledgebases.KnowledgeBase{}).Where("id IN (?)", kbIDs).Pluck("name", &kbNames)
+		agent.KBNames = kbNames
+
+		// 查询工具名称
+		var toolIDs []int64
+		var toolNames []string
+		json.Unmarshal(agent.Tools, &toolIDs)
+		global.DB.Model(&mcp.MCPTool{}).Where("id IN (?)", toolIDs).Pluck("name", &toolNames)
+		agent.ToolNames = toolNames
 
 		agent.Statistics = &AgentStatistics{
 			TotalMessages:       int64(len(agent.Conversations)),
@@ -363,6 +378,23 @@ func GetAgent(c *gin.Context) {
 		Joins("JOIN conversations ON messages.conversation_id = conversations.id").
 		Where("conversations.agent_id = ?", id).
 		Scan(&tokenUsage)
+
+	// 填充知识库名称和工具名称
+	var kbIDs []int64
+	var kbNames []string
+	json.Unmarshal(agent.KnowledgeBases, &kbIDs)
+	if len(kbIDs) > 0 {
+		global.DB.Model(&knowledgebases.KnowledgeBase{}).Where("id IN (?)", kbIDs).Pluck("name", &kbNames)
+	}
+	agent.KBNames = kbNames
+
+	var toolIDs []int64
+	var toolNames []string
+	json.Unmarshal(agent.Tools, &toolIDs)
+	if len(toolIDs) > 0 {
+		global.DB.Model(&mcp.MCPTool{}).Where("id IN (?)", toolIDs).Pluck("name", &toolNames)
+	}
+	agent.ToolNames = toolNames
 
 	response := AgentResponse{
 		Agent:             &agent,

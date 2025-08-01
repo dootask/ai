@@ -5,6 +5,19 @@ import (
 	"time"
 )
 
+// 配置类型常量
+const (
+	ConfigTypeURL = 0 // URL配置
+	ConfigTypeNPX = 1 // NPX配置
+)
+
+// 配置信息结构体
+type ConfigInfo struct {
+	Type       int8                   `json:"type"`        // 配置类型：0-URL配置 1-NPX配置
+	HasApiKey  bool                   `json:"has_api_key"` // 是否有API密钥
+	ConfigData map[string]interface{} `json:"config_data"` // 配置数据（不包含敏感信息）
+}
+
 // MCPTool MCP工具模型
 type MCPTool struct {
 	ID          int64           `gorm:"primaryKey;autoIncrement" json:"id"`
@@ -14,6 +27,7 @@ type MCPTool struct {
 	Description *string         `gorm:"type:text" json:"description"`
 	Category    string          `gorm:"type:varchar(50);not null;default:'external'" json:"category" validate:"required,oneof=dootask external custom"`
 	Type        string          `gorm:"type:varchar(20);not null;default:'external'" json:"type" validate:"required,oneof=internal external"`
+	ConfigType  int8            `gorm:"type:smallint;default:0" json:"config_type"`
 	Config      json.RawMessage `gorm:"type:jsonb;default:'{}'" json:"config"`
 	Permissions json.RawMessage `gorm:"type:jsonb;default:'[\"read\"]'" json:"permissions"`
 	IsActive    bool            `gorm:"default:true" json:"is_active"`
@@ -72,6 +86,8 @@ type MCPToolResponse struct {
 	SuccessRate         float64 `json:"success_rate"`
 	// 关联智能体数量
 	AssociatedAgents int64 `json:"associated_agents"`
+	// 配置信息
+	ConfigInfo *ConfigInfo `json:"config_info,omitempty"`
 }
 
 // MCPToolStatsResponse MCP工具统计响应

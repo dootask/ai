@@ -32,6 +32,10 @@ type Agent struct {
 
 	// 统计信息
 	Statistics *AgentStatistics `gorm:"-" json:"statistics,omitempty"`
+
+	// 其他信息
+	KBNames   []string `gorm:"-" json:"kb_names,omitempty"`
+	ToolNames []string `gorm:"-" json:"tool_names,omitempty"`
 }
 
 // AgentStatistics 智能体统计信息

@@ -60,13 +60,20 @@ interface MCPToolResponse {
   is_active: boolean; // 后端返回的字段名
   created_at: string; // 后端返回的字段名
   updated_at: string; // 后端返回的字段名
+  mcp_name?: string; // 新增：MCP工具标识
+  config_type?: number; // 新增：配置类型 0-URL配置 1-NPX配置
   // 统计信息
   total_calls?: number;
   today_calls?: number;
   average_response_time?: number;
   success_rate?: number;
   associated_agents?: number;
-  mcp_name?: string; // 新增：MCP工具标识
+  // 新增：配置信息
+  config_info?: {
+    type: number;
+    has_api_key: boolean;
+    config_data: Record<string, unknown>;
+  };
 }
 
 // 前端表单数据类型
@@ -109,12 +116,20 @@ const transformToFrontendFormat = (tool: MCPToolResponse): MCPTool => {
     isActive: tool.is_active, // 转换字段名
     createdAt: tool.created_at, // 转换字段名
     updatedAt: tool.updated_at, // 转换字段名
+    // 新增：配置类型
+    configType: tool.config_type || 0,
     // 配置方式
-    configType: configType,
+    configTypeName: configType,
     // 提取配置字段供前端使用
     apiKey: (config.apiKey as string) || '',
     baseUrl: (config.baseUrl as string) || '',
     npxConfig: configType === 'npx' ? JSON.stringify(config, null, 2) : '',
+    // 新增：配置信息
+    configInfo: tool.config_info ? {
+      type: tool.config_info.type,
+      hasApiKey: tool.config_info.has_api_key,
+      configData: tool.config_info.config_data,
+    } : undefined,
     statistics:
       tool.total_calls !== undefined
         ? {

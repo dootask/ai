@@ -131,6 +131,10 @@ export interface Agent {
 
   // 统计信息
   statistics?: AgentStatistics | null;
+
+  // 新增：知识库名称和工具名称
+  kb_names?: string[];
+  tool_names?: string[];
 }
 
 export interface AgentStatistics {
@@ -224,7 +228,6 @@ export interface KnowledgeBase {
   embedding_model: string; // 后端字段名
   chunk_size: number;
   chunk_overlap: number;
-  api_key?: string | null; // 后端字段名
   provider: string; // 新增
   proxy_url?: string | null; // 新增
   metadata: unknown; // JSONB字段
@@ -281,13 +284,21 @@ export interface MCPTool {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  // 新增：配置类型
+  configType?: number; // 0-URL配置 1-NPX配置
   // 前端扩展字段（从config中提取）
   apiKey?: string;
   baseUrl?: string;
   // 新增：配置方式
-  configType?: 'url' | 'npx';
+  configTypeName?: 'url' | 'npx';
   npxConfig?: string;
   statistics?: MCPToolStatistics;
+  // 新增：配置信息
+  configInfo?: {
+    type: number;
+    hasApiKey: boolean;
+    configData: Record<string, unknown>;
+  };
 }
 
 export interface MCPToolStatistics {

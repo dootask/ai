@@ -2,12 +2,12 @@
 
 import { CommandSelect, CommandSelectOption } from '@/components/command-select';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,7 +70,7 @@ export default function EditKnowledgeBasePage() {
         embeddingModel: formattedKB.embedding_model,
         chunkSize: formattedKB.chunk_size || 1000,
         chunkOverlap: formattedKB.chunk_overlap || 200,
-        apiKey: formattedKB.api_key || '',
+        apiKey: '', // API密钥留空，因为后端不再返回
         proxyUrl: formattedKB.proxy_url || '', // 新增
         isActive: formattedKB.is_active,
       });

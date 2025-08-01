@@ -127,7 +127,7 @@ export default function AgentsPage() {
     totalMessages: agents.reduce((sum, agent) => sum + (agent.statistics?.total_messages || 0), 0),
     averageResponseTime:
       agents.length > 0
-        ? agents.reduce((sum, agent) => sum + (agent.statistics?.average_response_time || 1200), 0) / agents.length
+        ? agents.reduce((sum, agent) => sum + (agent.statistics?.average_response_time || 0), 0) / agents.length
         : 0,
   };
 
@@ -346,22 +346,22 @@ export default function AgentsPage() {
 
                   {/* 工具和知识库信息 */}
                   <div className="bg-muted/50 space-y-2 rounded-lg p-3">
-                    {getToolsArray(agent.tools).length > 0 ? (
+                    {agent.tool_names && agent.tool_names.length > 0 ? (
                       <div>
                         <p className="text-muted-foreground mb-1 text-xs">
-                          MCP工具 ({getToolsArray(agent.tools).length})
+                          MCP工具 ({agent.tool_names.length})
                         </p>
                         <div className="flex flex-wrap gap-1">
-                          {getToolsArray(agent.tools)
+                          {agent.tool_names
                             .slice(0, 2)
                             .map((tool: string) => (
                               <Badge key={tool} variant="outline" className="text-xs">
                                 {tool}
                               </Badge>
                             ))}
-                          {getToolsArray(agent.tools).length > 2 && (
+                          {agent.tool_names.length > 2 && (
                             <Badge variant="outline" className="text-xs">
-                              +{getToolsArray(agent.tools).length - 2}
+                              +{agent.tool_names.length - 2}
                             </Badge>
                           )}
                         </div>
@@ -372,22 +372,22 @@ export default function AgentsPage() {
                       </div>
                     )}
 
-                    {getKnowledgeBasesArray(agent.knowledge_bases).length > 0 ? (
+                    {agent.kb_names && agent.kb_names.length > 0 ? (
                       <div>
                         <p className="text-muted-foreground mb-1 text-xs">
-                          知识库 ({getKnowledgeBasesArray(agent.knowledge_bases).length})
+                          知识库 ({agent.kb_names.length})
                         </p>
                         <div className="flex flex-wrap gap-1">
-                          {getKnowledgeBasesArray(agent.knowledge_bases)
+                          {agent.kb_names
                             .slice(0, 2)
                             .map((kb: string) => (
                               <Badge key={kb} variant="outline" className="text-xs">
                                 {kb}
                               </Badge>
                             ))}
-                          {getKnowledgeBasesArray(agent.knowledge_bases).length > 2 && (
+                          {agent.kb_names.length > 2 && (
                             <Badge variant="outline" className="text-xs">
-                              +{getKnowledgeBasesArray(agent.knowledge_bases).length - 2}
+                              +{agent.kb_names.length - 2}
                             </Badge>
                           )}
                         </div>

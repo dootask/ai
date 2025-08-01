@@ -1,6 +1,7 @@
 package aimodels
 
 import (
+	"database/sql"
 	"dootask-ai/go-service/global"
 	"dootask-ai/go-service/routes/api/agents"
 	"dootask-ai/go-service/routes/api/conversations"
@@ -197,7 +198,7 @@ func (h *Handler) GetAIModel(c *gin.Context) {
 	model.ConversationCount = conversationCount
 
 	// 获取关联的token使用量
-	var tokenUsage int64
+	var tokenUsage sql.NullInt64
 	if err := global.DB.Model(&conversations.Message{}).Joins(
 		"LEFT JOIN conversations ON conversations.id = messages.conversation_id",
 	).Joins(
@@ -210,7 +211,7 @@ func (h *Handler) GetAIModel(c *gin.Context) {
 		})
 		return
 	}
-	model.TokenUsage = tokenUsage
+	model.TokenUsage = tokenUsage.Int64
 
 	// 隐藏敏感信息
 	if model.ApiKey != nil && *model.ApiKey != "" {

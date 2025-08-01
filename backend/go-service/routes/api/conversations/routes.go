@@ -345,7 +345,7 @@ func GetConversation(c *gin.Context) {
 	var avgResponseTimeMs sql.NullFloat64
 	global.DB.Model(&Message{}).
 		Select("AVG(response_time_ms)").
-		Where("conversation_id = ? AND role = 'assistant' AND response_time_ms IS NOT NULL", id).
+		Where("conversation_id = ? AND role = 'assistant' AND response_time_ms > 0", id).
 		Scan(&avgResponseTimeMs)
 
 	var averageResponseTime float64
@@ -532,7 +532,7 @@ func calculateConversationStatistics(userID int64) ConversationStatistics {
 		SELECT avg(m.response_time_ms) FROM agents a
 		LEFT JOIN conversations c ON a.id = c.agent_id
 		LEFT JOIN messages m ON c.id= m.conversation_id
-		WHERE a.user_id = ? AND m.status = 1 AND m.role = 'assistant'
+		WHERE a.user_id = ? AND m.status = 1 AND m.role = 'assistant' AND m.response_time_ms > 0
 	`, global.DooTaskUser.UserID).Scan(&averageResponseTime)
 
 	stats.AverageResponseTime = averageResponseTime.Float64 / 1000.0

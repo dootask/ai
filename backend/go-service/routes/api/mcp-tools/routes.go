@@ -1,6 +1,7 @@
 package mcptools
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
@@ -278,6 +279,25 @@ func GetMCPTool(c *gin.Context) {
 		Where("tools::jsonb ? '" + idStr + "'").
 		Count(&associatedAgents)
 
+	// 处理配置信息
+	var configInfo *ConfigInfo
+	if tool.Config != nil {
+		var configData map[string]interface{}
+		if err := json.Unmarshal(tool.Config, &configData); err == nil {
+			// 根据配置类型决定是否检查API密钥
+			hasApiKeyValue := false
+			if tool.ConfigType == ConfigTypeURL {
+				hasApiKeyValue = hasApiKey(configData)
+			}
+
+			configInfo = &ConfigInfo{
+				Type:       tool.ConfigType,
+				HasApiKey:  hasApiKeyValue,
+				ConfigData: sanitizeConfigData(configData),
+			}
+		}
+	}
+
 	response := MCPToolResponse{
 		MCPTool:             &tool,
 		TotalCalls:          0,   // TODO: 从调用日志查询
@@ -285,9 +305,48 @@ func GetMCPTool(c *gin.Context) {
 		AverageResponseTime: 0.0, // TODO: 从调用日志计算
 		SuccessRate:         1.0, // TODO: 从调用日志计算
 		AssociatedAgents:    associatedAgents,
+		ConfigInfo:          configInfo,
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// hasApiKey 检查配置中是否有API密钥
+func hasApiKey(configData map[string]interface{}) bool {
+	// 检查常见的API密钥字段
+	keyFields := []string{"api_key", "apiKey", "key", "token", "secret"}
+	for _, field := range keyFields {
+		if value, exists := configData[field]; exists {
+			if str, ok := value.(string); ok && str != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// sanitizeConfigData 清理配置数据，移除敏感信息
+func sanitizeConfigData(configData map[string]interface{}) map[string]interface{} {
+	sanitized := make(map[string]interface{})
+
+	// 敏感字段列表
+	sensitiveFields := []string{"api_key", "apiKey", "key", "token", "secret", "password"}
+
+	for key, value := range configData {
+		isSensitive := false
+		for _, sensitiveField := range sensitiveFields {
+			if key == sensitiveField {
+				isSensitive = true
+				break
+			}
+		}
+
+		if !isSensitive {
+			sanitized[key] = value
+		}
+	}
+
+	return sanitized
 }
 
 // UpdateMCPTool 更新MCP工具
