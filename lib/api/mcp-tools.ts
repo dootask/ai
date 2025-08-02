@@ -61,7 +61,7 @@ interface MCPToolResponse {
   created_at: string; // 后端返回的字段名
   updated_at: string; // 后端返回的字段名
   mcp_name?: string; // 新增：MCP工具标识
-  config_type?: number; // 新增：配置类型 0-URL配置 1-NPX配置
+  config_type?: number; // 新增：配置类型 0-streamable_http 1-websocket 2-sse 3-stdio
   // 统计信息
   total_calls?: number;
   today_calls?: number;
@@ -86,23 +86,36 @@ interface MCPToolFormData {
   config?: Record<string, unknown>;
   permissions?: string[];
   isActive?: boolean;
-  // 配置方式
-  configType: 'url' | 'npx'; // 新增：配置方式
-  // 用于前端表单的辅助字段（URL方式）
-  apiKey?: string;
-  baseUrl?: string;
-  // 用于前端表单的辅助字段（NPX方式）
-  npxConfig?: string; // 新增：NPX配置JSON字符串
+  // 配置方式 - 扩展为四种方式
+  configType: 'streamable_http' | 'websocket' | 'sse' | 'stdio';
+  // 统一配置信息为JSON格式
+  configJson?: string; // JSON格式的配置信息
 }
 
 // 数据转换函数：后端格式 → 前端格式
 const transformToFrontendFormat = (tool: MCPToolResponse): MCPTool => {
-  // 从config中提取apiKey和baseUrl
+  // 从config中提取配置信息
   const config = tool.config || {};
   
-  // 判断配置方式
-  const hasApiKey = config.apiKey && config.baseUrl;
-  const configType = hasApiKey ? 'url' : 'npx';
+  // 根据后端的config_type字段判断配置方式
+  // config_type: 0-streamable_http 1-websocket 2-sse 3-stdio
+  let configType: 'streamable_http' | 'websocket' | 'sse' | 'stdio';
+  switch (tool.config_type) {
+    case 1:
+      configType = 'websocket';
+      break;
+    case 2:
+      configType = 'sse';
+      break;
+    case 3:
+      configType = 'stdio';
+      break;
+    default:
+      configType = 'streamable_http';
+  }
+  
+  // 生成配置JSON字符串
+  const configJson = Object.keys(config).length > 0 ? JSON.stringify(config, null, 2) : '{}';
   
   return {
     id: tool.id.toString(), // 转换为string类型
@@ -120,10 +133,8 @@ const transformToFrontendFormat = (tool: MCPToolResponse): MCPTool => {
     configType: tool.config_type || 0,
     // 配置方式
     configTypeName: configType,
-    // 提取配置字段供前端使用
-    apiKey: (config.apiKey as string) || '',
-    baseUrl: (config.baseUrl as string) || '',
-    npxConfig: configType === 'npx' ? JSON.stringify(config, null, 2) : '',
+    // 统一配置信息为JSON格式
+    configJson: configJson,
     // 新增：配置信息
     configInfo: tool.config_info ? {
       type: tool.config_info.type,
@@ -144,30 +155,23 @@ const transformToFrontendFormat = (tool: MCPToolResponse): MCPTool => {
 
 // 数据转换函数：前端格式 → 后端格式
 const transformToBackendFormat = (data: MCPToolFormData): CreateMCPToolRequest | UpdateMCPToolRequest => {
-  let config: Record<string, unknown> = { ...data.config };
+  // 直接使用前端传递的config，因为前端已经解析了JSON
+  const config: Record<string, unknown> = data.config || {};
   
-  if (data.configType === 'url') {
-    // URL方式：将apiKey和baseUrl合并到config中
-    if (data.apiKey) {
-      config.apiKey = data.apiKey;
-    }
-    if (data.baseUrl) {
-      config.baseUrl = data.baseUrl;
-    }
-  } else if (data.configType === 'npx') {
-    // NPX方式：解析JSON配置
-    try {
-      if (data.npxConfig) {
-        const parsedConfig = JSON.parse(data.npxConfig);
-        config = { ...config, ...parsedConfig };
-      }
-    } catch (error) {
-      console.error('NPX配置JSON解析失败:', error);
-      // 保持原有配置，不覆盖错误信息
-      if (data.config) {
-        config = { ...data.config };
-      }
-    }
+  // 根据配置方式设置config_type
+  let configType: number;
+  switch (data.configType) {
+    case 'websocket':
+      configType = 1;
+      break;
+    case 'sse':
+      configType = 2;
+      break;
+    case 'stdio':
+      configType = 3;
+      break;
+    default:
+      configType = 0; // streamable_http
   }
 
   // 构建基础请求对象
@@ -177,8 +181,9 @@ const transformToBackendFormat = (data: MCPToolFormData): CreateMCPToolRequest |
     description: data.description || '',
     category: data.category,
     type: data.type,
-    config: config, // 使用合并后的config
+    config: config, // 使用前端传递的config
     permissions: data.permissions || [],
+    config_type: configType, // 设置配置类型
   };
 
   // 如果是更新请求，添加isActive字段
@@ -215,6 +220,7 @@ export const mcpToolsApi = {
       total_pages: number;
       data: {
         items: MCPToolResponse[];
+        stats: MCPToolStatsResponse;
       };
     }
 
@@ -225,6 +231,7 @@ export const mcpToolsApi = {
     // 转换后端数据格式为前端格式
     const transformedData: MCPToolListData = {
       items: response.data.data.items.map((tool: MCPToolResponse) => transformToFrontendFormat(tool)),
+      stats: response.data.data.stats,
     };
 
     return {

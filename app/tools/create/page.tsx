@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toolCategories, toolPermissions, toolTypes } from '@/lib/ai';
 import { mcpToolsApi, type MCPToolFormData } from '@/lib/api/mcp-tools';
-import { ExternalLink, Key, Save, Settings, Shield, Wrench } from 'lucide-react';
+import { Save, Settings, Shield, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -31,10 +31,8 @@ interface FormData {
   type: 'internal' | 'external';
   config: Record<string, unknown>;
   permissions: string[];
-  configType: 'url' | 'npx'; // 新增：配置方式
-  apiKey?: string;
-  baseUrl?: string;
-  npxConfig?: string; // 新增：NPX配置
+  configType: 'streamable_http' | 'websocket' | 'sse' | 'stdio'; // 扩展为四种方式
+  configJson?: string; // 统一配置信息为JSON格式
 }
 
 export default function CreateMCPToolPage() {
@@ -48,10 +46,8 @@ export default function CreateMCPToolPage() {
     type: 'external',
     config: {},
     permissions: ['read'],
-    configType: 'url', // 新增：默认URL方式
-    apiKey: '',
-    baseUrl: '',
-    npxConfig: '', // 新增：NPX配置
+    configType: 'streamable_http', // 默认streamable_http方式
+    configJson: '', // 统一配置信息为JSON格式
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,12 +68,14 @@ export default function CreateMCPToolPage() {
       return;
     }
 
-    // 验证NPX配置JSON格式
-    if (formData.configType === 'npx' && formData.npxConfig) {
+    // 验证配置JSON格式并解析
+    let parsedConfig: Record<string, unknown> = {};
+    if (formData.configJson) {
       try {
-        JSON.parse(formData.npxConfig);
+        parsedConfig = JSON.parse(formData.configJson);
       } catch (error) {
-        toast.error('NPX配置JSON格式错误，请检查语法');
+        console.error('Failed to parse config JSON:', error);
+        toast.error('配置JSON格式错误，请检查语法');
         return;
       }
     }
@@ -92,12 +90,10 @@ export default function CreateMCPToolPage() {
         description: formData.description || '',
         category: formData.category,
         type: formData.type,
-        config: {}, // 保持空对象，让转换函数处理
+        config: parsedConfig, // 使用解析后的配置
         permissions: formData.permissions,
         configType: formData.configType, // 新增：配置方式
-        apiKey: formData.apiKey,
-        baseUrl: formData.baseUrl,
-        npxConfig: formData.npxConfig, // 新增：NPX配置
+        configJson: formData.configJson, // 统一配置信息为JSON格式
       };
 
       const newTool = await mcpToolsApi.create(toolFormData);
@@ -266,121 +262,115 @@ export default function CreateMCPToolPage() {
                 {/* 配置方式选择 */}
                 <div className="space-y-2">
                   <Label>配置方式 *</Label>
-                  <div className="flex gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center space-x-2">
                       <input
                         type="radio"
-                        id="config-url"
+                        id="config-streamable-http"
                         name="configType"
-                        value="url"
-                        checked={formData.configType === 'url'}
+                        value="streamable_http"
+                        checked={formData.configType === 'streamable_http'}
                         onChange={e => {
-                          const newConfigType = e.target.value as 'url' | 'npx';
+                          const newConfigType = e.target.value as 'streamable_http' | 'websocket' | 'sse' | 'stdio';
                           setFormData(prev => ({
                             ...prev,
                             configType: newConfigType,
                             // 清空之前的配置
-                            apiKey: newConfigType === 'url' ? prev.apiKey : '',
-                            baseUrl: newConfigType === 'url' ? prev.baseUrl : '',
-                            npxConfig: newConfigType === 'npx' ? prev.npxConfig : '',
+                            configJson: '',
                           }));
                         }}
                         className="h-4 w-4"
                       />
-                      <Label htmlFor="config-url" className="text-sm font-normal">URL方式</Label>
+                      <Label htmlFor="config-streamable-http" className="text-sm font-normal">Streamable HTTP</Label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <input
                         type="radio"
-                        id="config-npx"
+                        id="config-websocket"
                         name="configType"
-                        value="npx"
-                        checked={formData.configType === 'npx'}
+                        value="websocket"
+                        checked={formData.configType === 'websocket'}
                         onChange={e => {
-                          const newConfigType = e.target.value as 'url' | 'npx';
+                          const newConfigType = e.target.value as 'streamable_http' | 'websocket' | 'sse' | 'stdio';
                           setFormData(prev => ({
                             ...prev,
                             configType: newConfigType,
                             // 清空之前的配置
-                            apiKey: newConfigType === 'url' ? prev.apiKey : '',
-                            baseUrl: newConfigType === 'url' ? prev.baseUrl : '',
-                            npxConfig: newConfigType === 'npx' ? prev.npxConfig : '',
+                            configJson: '',
                           }));
                         }}
                         className="h-4 w-4"
                       />
-                      <Label htmlFor="config-npx" className="text-sm font-normal">NPX方式</Label>
+                      <Label htmlFor="config-websocket" className="text-sm font-normal">WebSocket</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="config-sse"
+                        name="configType"
+                        value="sse"
+                        checked={formData.configType === 'sse'}
+                        onChange={e => {
+                          const newConfigType = e.target.value as 'streamable_http' | 'websocket' | 'sse' | 'stdio';
+                          setFormData(prev => ({
+                            ...prev,
+                            configType: newConfigType,
+                            // 清空之前的配置
+                            configJson: '',
+                          }));
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="config-sse" className="text-sm font-normal">Server-Sent Events</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="radio"
+                        id="config-stdio"
+                        name="configType"
+                        value="stdio"
+                        checked={formData.configType === 'stdio'}
+                        onChange={e => {
+                          const newConfigType = e.target.value as 'streamable_http' | 'websocket' | 'sse' | 'stdio';
+                          setFormData(prev => ({
+                            ...prev,
+                            configType: newConfigType,
+                            // 清空之前的配置
+                            configJson: '',
+                          }));
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="config-stdio" className="text-sm font-normal">Standard I/O</Label>
                     </div>
                   </div>
                   <p className="text-muted-foreground text-xs">
-                    URL方式：通过HTTP API调用 | NPX方式：通过本地NPX包调用
+                    Streamable HTTP：流式HTTP连接 | WebSocket：WebSocket连接 | SSE：Server-Sent Events | STDIO：标准输入输出
                   </p>
                 </div>
 
-                {/* URL方式配置 */}
-                {formData.configType === 'url' && (
-                  <>
-                    {formData.type === 'external' && (
-                      <div className="space-y-2">
-                        <Label className="flex items-center gap-2">
-                          <ExternalLink className="h-4 w-4" />
-                          API 基础 URL
-                        </Label>
-                        <Input
-                          placeholder="https://api.example.com/v1"
-                          value={formData.baseUrl}
-                          onChange={e => setFormData(prev => ({ ...prev, baseUrl: e.target.value }))}
-                        />
-                        <p className="text-muted-foreground text-xs">外部 API 服务的基础地址</p>
-                      </div>
-                    )}
-
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Key className="h-4 w-4" />
-                        API Key / 访问令牌
-                      </Label>
-                      <Input
-                        type="password"
-                        placeholder="sk-... 或其他访问令牌"
-                        value={formData.apiKey}
-                        onChange={e => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
-                      />
-                      <p className="text-muted-foreground text-xs">用于访问 API 的密钥或令牌</p>
-                    </div>
-                  </>
-                )}
-
-                {/* NPX方式配置 */}
-                {formData.configType === 'npx' && (
-                  <div className="space-y-2">
-                    <Label>NPX配置 (JSON格式) *</Label>
-                    <Textarea
-                      placeholder={`{
-  "command": "npx @modelcontextprotocol/server-filesystem@latest",
-  "args": ["--root", "/path/to/files"],
-  "env": {
-    "API_KEY": "your-api-key"
-  }
-}`}
-                      value={formData.npxConfig}
-                      onChange={e => setFormData(prev => ({ ...prev, npxConfig: e.target.value }))}
-                      rows={8}
-                      className="font-mono text-sm"
-                    />
-                    <p className="text-muted-foreground text-xs">
-                      输入NPX工具的JSON配置，包含命令、参数和环境变量等
-                    </p>
-                  </div>
-                )}
+                {/* 配置信息JSON输入 */}
+                <div className="space-y-2">
+                  <Label>配置信息 (JSON格式) *</Label>
+                  <Textarea
+                    placeholder={getConfigPlaceholder(formData.configType)}
+                    value={formData.configJson}
+                    onChange={e => setFormData(prev => ({ ...prev, configJson: e.target.value }))}
+                    rows={12}
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    输入{getConfigTypeDescription(formData.configType)}的JSON配置信息
+                  </p>
+                </div>
 
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
                   <div className="flex items-start gap-2">
                     <div className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-amber-500"></div>
                     <div className="text-sm">
-                      <p className="font-medium text-amber-900">安全提示</p>
+                      <p className="font-medium text-amber-900">配置提示</p>
                       <p className="mt-1 text-amber-800">
-                        API 密钥将被安全加密存储。请确保使用具有适当权限的专用 API 密钥。
+                        请根据选择的配置方式填写相应的JSON配置信息。敏感信息如API密钥将被安全加密存储。
                       </p>
                     </div>
                   </div>
@@ -463,4 +453,65 @@ export default function CreateMCPToolPage() {
       </div>
     </div>
   );
+}
+
+// 辅助函数：根据配置方式获取占位符文本
+function getConfigPlaceholder(configType: string): string {
+  switch (configType) {
+    case 'streamable_http':
+      return `{
+  "baseUrl": "https://api.example.com/v1",
+  "apiKey": "your-api-key",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "timeout": 30000
+}`;
+    case 'websocket':
+      return `{
+  "url": "wss://api.example.com/ws",
+  "protocols": ["protocol1", "protocol2"],
+  "headers": {
+    "Authorization": "Bearer your-token"
+  },
+  "reconnectInterval": 5000
+}`;
+    case 'sse':
+      return `{
+  "url": "https://api.example.com/events",
+  "headers": {
+    "Authorization": "Bearer your-token"
+  },
+  "retry": 3000
+}`;
+    case 'stdio':
+      return `{
+  "command": "npx @modelcontextprotocol/server-filesystem@latest",
+  "args": ["--root", "/path/to/files"],
+  "env": {
+    "API_KEY": "your-api-key"
+  },
+  "cwd": "/working/directory"
+}`;
+    default:
+      return `{
+  "config": "your configuration here"
+}`;
+  }
+}
+
+// 辅助函数：根据配置方式获取描述文本
+function getConfigTypeDescription(configType: string): string {
+  switch (configType) {
+    case 'streamable_http':
+      return '流式HTTP连接';
+    case 'websocket':
+      return 'WebSocket连接';
+    case 'sse':
+      return 'Server-Sent Events连接';
+    case 'stdio':
+      return '标准输入输出';
+    default:
+      return '连接';
+  }
 }

@@ -5,15 +5,17 @@ import (
 	"time"
 )
 
-// 配置类型常量
+// 配置类型常量 - 扩展为四种方式
 const (
-	ConfigTypeURL = 0 // URL配置
-	ConfigTypeNPX = 1 // NPX配置
+	ConfigTypeStreamableHTTP = 0 // Streamable HTTP配置
+	ConfigTypeWebSocket      = 1 // WebSocket配置
+	ConfigTypeSSE            = 2 // Server-Sent Events配置
+	ConfigTypeSTDIO          = 3 // Standard I/O配置
 )
 
 // 配置信息结构体
 type ConfigInfo struct {
-	Type       int8                   `json:"type"`        // 配置类型：0-URL配置 1-NPX配置
+	Type       int8                   `json:"type"`        // 配置类型：0-streamable_http 1-websocket 2-sse 3-stdio
 	HasApiKey  bool                   `json:"has_api_key"` // 是否有API密钥
 	ConfigData map[string]interface{} `json:"config_data"` // 配置数据（不包含敏感信息）
 }
@@ -47,6 +49,7 @@ type CreateMCPToolRequest struct {
 	Description *string         `json:"description"`
 	Category    string          `json:"category" validate:"required,oneof=dootask external custom"`
 	Type        string          `json:"type" validate:"required,oneof=internal external"`
+	ConfigType  *int8           `json:"config_type" validate:"omitempty,min=0,max=3"` // 配置类型：0-streamable_http 1-websocket 2-sse 3-stdio
 	Config      json.RawMessage `json:"config"`
 	Permissions json.RawMessage `json:"permissions"`
 }
@@ -58,6 +61,7 @@ type UpdateMCPToolRequest struct {
 	Description *string         `json:"description"`
 	Category    *string         `json:"category" validate:"omitempty,oneof=dootask external custom"`
 	Type        *string         `json:"type" validate:"omitempty,oneof=internal external"`
+	ConfigType  *int8           `json:"config_type" validate:"omitempty,min=0,max=3"` // 配置类型：0-streamable_http 1-websocket 2-sse 3-stdio
 	Config      json.RawMessage `json:"config"`
 	Permissions json.RawMessage `json:"permissions"`
 	IsActive    *bool           `json:"is_active"`
@@ -73,7 +77,8 @@ type MCPToolFilters struct {
 
 // MCPToolListData MCP工具列表数据结构
 type MCPToolListData struct {
-	Items []MCPTool `json:"items"`
+	Items []MCPTool            `json:"items"`
+	Stats MCPToolStatsResponse `json:"stats"`
 }
 
 // MCPToolResponse MCP工具详情响应

@@ -3,10 +3,12 @@ package mcptools
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
 	"dootask-ai/go-service/global"
+	"dootask-ai/go-service/routes/api/conversations"
 	"dootask-ai/go-service/utils"
 
 	"github.com/gin-gonic/gin"
@@ -137,9 +139,48 @@ func ListMCPTools(c *gin.Context) {
 		return
 	}
 
+	// 统计工具总数
+	var totalTools int64
+	global.DB.Model(&MCPTool{}).Where("user_id = ?", global.DooTaskUser.UserID).Count(&totalTools)
+
+	// 统计启用工具总数
+	var activeTools int64
+	global.DB.Model(&MCPTool{}).Where("user_id = ? AND is_active = ?", global.DooTaskUser.UserID, true).Count(&activeTools)
+
+	// 统计对话消息中使用MCP工具的次数
+	var messages []conversations.Message
+	global.DB.Model(&conversations.Conversation{}).Joins(
+		"LEFT JOIN messages ON conversations.id = messages.conversation_id",
+	).Where("conversations.dootask_user_id = ?", strconv.Itoa(int(global.DooTaskUser.UserID))).
+		Where("messages.mcp_used IS NOT NULL").Select("messages.*").Find(&messages)
+
+	var stats MCPToolStatsResponse
+	for _, message := range messages {
+		if message.McpUsed != nil {
+			var mcpUsed []string
+			if err := json.Unmarshal(message.McpUsed, &mcpUsed); err == nil {
+				stats.TotalCalls += int64(len(mcpUsed))
+			}
+		}
+		if message.ResponseTimeMs != nil {
+			stats.AvgResponseTime += float64(*message.ResponseTimeMs)
+		}
+	}
+
+	if len(messages) > 0 {
+		stats.AvgResponseTime = stats.AvgResponseTime / float64(len(messages)) / 1000
+	}
+
 	// 构造响应数据
 	data := MCPToolListData{
 		Items: tools,
+		Stats: MCPToolStatsResponse{
+			Total:           totalTools,
+			Active:          activeTools,
+			Inactive:        totalTools - activeTools,
+			TotalCalls:      stats.TotalCalls,
+			AvgResponseTime: stats.AvgResponseTime,
+		},
 	}
 
 	// 使用统一分页响应格式
@@ -215,6 +256,12 @@ func CreateMCPTool(c *gin.Context) {
 		req.Permissions = []byte("[\"read\"]")
 	}
 
+	// 设置默认配置类型
+	configType := int8(ConfigTypeStreamableHTTP) // 默认为streamable_http配置
+	if req.ConfigType != nil {
+		configType = *req.ConfigType
+	}
+
 	// 创建工具
 	tool := MCPTool{
 		UserID:      int64(global.DooTaskUser.UserID),
@@ -223,6 +270,7 @@ func CreateMCPTool(c *gin.Context) {
 		Description: req.Description,
 		Category:    req.Category,
 		Type:        req.Type,
+		ConfigType:  configType, // 新增：配置类型
 		Config:      req.Config,
 		Permissions: req.Permissions,
 		IsActive:    true,
@@ -286,12 +334,12 @@ func GetMCPTool(c *gin.Context) {
 		if err := json.Unmarshal(tool.Config, &configData); err == nil {
 			// 根据配置类型决定是否检查API密钥
 			hasApiKeyValue := false
-			if tool.ConfigType == ConfigTypeURL {
+			if tool.ConfigType == ConfigTypeStreamableHTTP {
 				hasApiKeyValue = hasApiKey(configData)
 			}
 
 			configInfo = &ConfigInfo{
-				Type:       tool.ConfigType,
+				Type:       int8(tool.ConfigType),
 				HasApiKey:  hasApiKeyValue,
 				ConfigData: sanitizeConfigData(configData),
 			}
@@ -333,13 +381,7 @@ func sanitizeConfigData(configData map[string]interface{}) map[string]interface{
 	sensitiveFields := []string{"api_key", "apiKey", "key", "token", "secret", "password"}
 
 	for key, value := range configData {
-		isSensitive := false
-		for _, sensitiveField := range sensitiveFields {
-			if key == sensitiveField {
-				isSensitive = true
-				break
-			}
-		}
+		isSensitive := slices.Contains(sensitiveFields, key)
 
 		if !isSensitive {
 			sanitized[key] = value
@@ -458,6 +500,9 @@ func UpdateMCPTool(c *gin.Context) {
 	}
 	if req.Type != nil {
 		updates["type"] = *req.Type
+	}
+	if req.ConfigType != nil {
+		updates["config_type"] = *req.ConfigType
 	}
 	if req.Config != nil {
 		updates["config"] = req.Config

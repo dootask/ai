@@ -1,5 +1,6 @@
 'use client';
 
+import { defaultPagination, Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,9 +14,10 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppContext } from '@/contexts/app-context';
+import { useDebounceCallback } from '@/hooks/use-debounce';
 import { toolCategories, toolPermissions, toolTypes } from '@/lib/ai';
 import { mcpToolsApi } from '@/lib/api/mcp-tools';
-import { MCPTool, PaginationBase } from '@/lib/types';
+import { MCPTool, MCPToolListData, MCPToolStatsResponse, PaginationBase, PaginationResponse } from '@/lib/types';
 import { getAllAgents } from '@/lib/utils';
 import {
   Activity,
@@ -34,8 +36,6 @@ import {
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { useDebounceCallback } from '@/hooks/use-debounce';
-import { defaultPagination, Pagination } from '@/components/pagination';
 
 export default function ToolsPage() {
   const [tools, setTools] = useState<MCPTool[]>([]);
@@ -43,6 +43,7 @@ export default function ToolsPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [toolStats, setToolStats] = useState<MCPToolStatsResponse | null>(null);
 
   const { Confirm } = useAppContext();
 
@@ -62,7 +63,7 @@ export default function ToolsPage() {
       }
 
       // 获取工具列表
-      const response = await mcpToolsApi.list({
+      const response: PaginationResponse<MCPToolListData> = await mcpToolsApi.list({
         page: pagination.current_page,
         page_size: pagination.page_size,
         filters,
@@ -70,6 +71,11 @@ export default function ToolsPage() {
 
       setTools(response.data.items);
       setPagination(response);
+      
+      // 设置统计信息
+      if (response.data.stats) {
+        setToolStats(response.data.stats);
+      }
     } catch (error) {
       console.error('Failed to load tools:', error);
       toast.error('加载工具列表失败');
@@ -222,17 +228,6 @@ export default function ToolsPage() {
     }
   };
 
-  // 统计数据
-  const stats = {
-    total: tools.length,
-    active: tools.filter(tool => tool.isActive).length,
-    totalCalls: tools.reduce((sum, tool) => sum + (tool.statistics?.totalCalls || 0), 0),
-    avgResponseTime:
-      tools.length > 0
-        ? tools.reduce((sum, tool) => sum + (tool.statistics?.averageResponseTime || 0), 0) / tools.length
-        : 0,
-  };
-
   if (isLoading) {
     return (
       <div className="space-y-6 p-6">
@@ -314,18 +309,18 @@ export default function ToolsPage() {
             <Wrench className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-muted-foreground text-xs">活跃: {stats.active}</p>
+            <div className="text-2xl font-bold">{toolStats?.total || 0}</div>
+            <p className="text-muted-foreground text-xs">活跃: {toolStats?.active || 0}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">总调用次数</CardTitle>
-            <Activity className="text-muted-foreground h-4 w-4" />
+            <TrendingUp className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalCalls.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{(toolStats?.total_calls || 0).toLocaleString()}</div>
             <p className="text-muted-foreground text-xs">所有工具累计</p>
           </CardContent>
         </Card>
@@ -336,7 +331,7 @@ export default function ToolsPage() {
             <Clock className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgResponseTime.toFixed(1)}s</div>
+            <div className="text-2xl font-bold">{(toolStats?.avg_response_time || 0).toFixed(1)}s</div>
             <p className="text-muted-foreground text-xs">工具处理时间</p>
           </CardContent>
         </Card>

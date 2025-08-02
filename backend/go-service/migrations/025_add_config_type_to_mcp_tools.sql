@@ -1,4 +1,4 @@
--- Description: 为mcp_tools表添加config_type字段, 0-URL配置 1-NPX配置
+-- Description: 为mcp_tools表添加config_type字段, 0-streamable_http 1-websocket 2-sse 3-stdio
 -- 添加config_type字段到mcp_tools表
 
 DO $$

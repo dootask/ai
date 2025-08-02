@@ -236,15 +236,15 @@ func (h *Handler) Stream(c *gin.Context) {
 
 	// 创建消息处理器
 	handler := NewMessageHandler(global.DB, global.DooTaskClient.Client)
+	// 记录开始时间
+	startTime := time.Now()
 
 	// 启动协程写入AI响应到Redis
-	go handler.writeAIResponseToRedis(ctx, resp.Body, req.StreamId)
+	go handler.writeAIResponseToRedis(ctx, resp.Body, req, startTime)
 
 	// 流式消息读取，阻塞式BRPop
 	isFirstLine := true
 
-	// 记录开始时间
-	startTime := time.Now()
 	previousMessageType := ""
 
 	c.Stream(func(w io.Writer) bool {
@@ -295,8 +295,7 @@ func (h *Handler) Stream(c *gin.Context) {
 				previousMessageType = v.Type
 			}
 
-			// 设置是否为第一行，只有token类型的消息才需要判断
-			if v.Type == "token" {
+			if v.Type == "token" || v.Type == "tool" {
 				if previousMessageType == "thinking" {
 					isFirstLine = true
 					previousMessageType = ""
@@ -373,6 +372,8 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 
 	var (
 		path      = "/stream"
+		isUseTool = false
+		isUseRag  = false
 		ragConfig = []map[string]any{}
 		mcpConfig = map[string]any{}
 	)
@@ -384,6 +385,7 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		json.Unmarshal([]byte(agent.KnowledgeBases), &kbIds)
 		global.DB.Where("id in (?) AND is_active = ?", kbIds, true).Find(&kbs)
 		if len(kbs) > 0 {
+			isUseRag = true
 			path = "/rag_agent/stream"
 			for _, kb := range kbs {
 				ragConfig = append(ragConfig, map[string]any{
@@ -405,14 +407,33 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		json.Unmarshal([]byte(agent.Tools), &mcpToolIds)
 		global.DB.Where("id in (?) AND is_active = ?", mcpToolIds, true).Find(&mcpTools)
 		if len(mcpTools) > 0 {
+			isUseTool = true
 			path = "/mcp_agent/stream"
 			for _, mcpTool := range mcpTools {
 				var config map[string]any
 				json.Unmarshal(mcpTool.Config, &config)
+				transport := ""
+				switch mcpTool.ConfigType {
+				case 0:
+					transport = "streamable_http"
+				case 1:
+					transport = "websocket"
+				case 2:
+					transport = "sse"
+				case 3:
+					transport = "stdio"
+				default:
+					transport = "streamable_http"
+				}
+				config["transport"] = transport
 				mcpConfig[mcpTool.McpName] = config
 			}
 			data["mcp_config"] = mcpConfig
 		}
+	}
+
+	if isUseTool && isUseRag {
+		path = "/supervisor_agent/stream"
 	}
 
 	resp, err := httpClient.Stream(context.Background(), path, nil, nil, http.MethodPost, data, "application/json")

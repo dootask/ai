@@ -99,6 +99,7 @@ export interface KnowledgeBaseListData {
 // MCP工具列表数据
 export interface MCPToolListData {
   items: MCPTool[];
+  stats: MCPToolStatsResponse;
 }
 
 // 对话统计信息
@@ -284,14 +285,13 @@ export interface MCPTool {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  // 新增：配置类型
-  configType?: number; // 0-URL配置 1-NPX配置
+  // 新增：配置类型 - 扩展为四种方式
+  configType?: number; // 0-streamable_http 1-websocket 2-sse 3-stdio
   // 前端扩展字段（从config中提取）
-  apiKey?: string;
-  baseUrl?: string;
   // 新增：配置方式
-  configTypeName?: 'url' | 'npx';
-  npxConfig?: string;
+  configTypeName?: 'streamable_http' | 'websocket' | 'sse' | 'stdio';
+  // 统一配置信息为JSON格式
+  configJson?: string;
   statistics?: MCPToolStatistics;
   // 新增：配置信息
   configInfo?: {
@@ -306,6 +306,20 @@ export interface MCPToolStatistics {
   todayCalls: number;
   averageResponseTime: number;
   successRate: number;
+}
+
+// MCP工具统计响应
+export interface MCPToolStatsResponse {
+  total: number;
+  active: number;
+  inactive: number;
+  dootask_tools: number;
+  external_tools: number;
+  custom_tools: number;
+  internal_tools: number;
+  external_type_tools: number;
+  total_calls: number;
+  avg_response_time: number;
 }
 
 export interface CreateMCPToolRequest {

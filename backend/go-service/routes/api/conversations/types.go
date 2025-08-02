@@ -37,6 +37,7 @@ type Message struct {
 	Metadata       json.RawMessage `gorm:"type:jsonb;default:'{}'" json:"metadata"`
 	TokensUsed     int             `gorm:"column:tokens_used;default:0" json:"tokens_used"`
 	ModelUsed      *string         `gorm:"column:model_used;type:varchar(100)" json:"model_used"`
+	McpUsed        json.RawMessage `gorm:"type:jsonb;default:'null" json:"mcp_used"`
 	ResponseTimeMs *int            `gorm:"column:response_time_ms" json:"response_time_ms,omitempty"`
 	Status         int             `gorm:"column:status;default:1" json:"status"`
 	CreatedAt      time.Time       `gorm:"column:created_at;autoCreateTime" json:"created_at"`
