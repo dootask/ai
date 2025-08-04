@@ -26,65 +26,7 @@ func RegisterRoutes(router *gin.RouterGroup) {
 		conversationGroup.GET("/:id", GetConversation)        // 获取对话详情
 		conversationGroup.GET("/:id/messages", GetMessages)   // 获取对话消息
 		conversationGroup.GET("/stats", GetConversationStats) // 获取对话统计
-		conversationGroup.GET("/test", TestConversations)     // 测试数据库连接
 	}
-}
-
-// TestConversations 测试对话表查询
-func TestConversations(c *gin.Context) {
-	// 测试基本数据库连接
-	var count int64
-	if err := global.DB.Model(&Conversation{}).Count(&count).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    "DATABASE_001",
-			"message": "数据库连接失败",
-			"data":    err.Error(),
-		})
-		return
-	}
-
-	// 测试基本查询
-	var conversations []Conversation
-	if err := global.DB.Limit(5).Find(&conversations).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    "DATABASE_001",
-			"message": "查询对话表失败",
-			"data":    err.Error(),
-		})
-		return
-	}
-
-	// 测试Agent表关联
-	var agentCount int64
-	if err := global.DB.Table("agents").Count(&agentCount).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    "DATABASE_001",
-			"message": "查询智能体表失败",
-			"data":    err.Error(),
-		})
-		return
-	}
-
-	// 测试Message表关联
-	var messageCount int64
-	if err := global.DB.Table("messages").Count(&messageCount).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    "DATABASE_001",
-			"message": "查询消息表失败",
-			"data":    err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "数据库连接正常",
-		"data": gin.H{
-			"conversations_count":  count,
-			"agents_count":         agentCount,
-			"messages_count":       messageCount,
-			"sample_conversations": conversations,
-		},
-	})
 }
 
 // ListConversations 获取对话列表
@@ -149,7 +91,7 @@ func ListConversations(c *gin.Context) {
 	if filters.Search != "" {
 		searchTerm := "%" + filters.Search + "%"
 		query = query.Joins("LEFT JOIN agents ON conversations.agent_id = agents.id").
-			Where("agents.name ILIKE ? OR conversations.dootask_user_id ILIKE ?", searchTerm, searchTerm)
+			Where("agents.name ILIKE ? ", searchTerm)
 	}
 
 	if filters.AgentID != nil {
