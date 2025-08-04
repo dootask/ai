@@ -28,6 +28,8 @@ def is_from_swagger(referer: str) -> bool:
     return "/docs" in referer or "/swagger" in referer
 
 def encrypt(plain_text):
+    if not settings.API_KEY:
+        return plain_text
     nonce = get_random_bytes(12)  # GCM 推荐12字节随机 nonce
     cipher = AES.new(settings.API_KEY.encode('utf-8'), AES.MODE_GCM, nonce=nonce)
     ciphertext, tag = cipher.encrypt_and_digest(plain_text.encode())
