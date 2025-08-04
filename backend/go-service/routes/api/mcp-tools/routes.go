@@ -103,10 +103,6 @@ func ListMCPTools(c *gin.Context) {
 		query = query.Where("category = ?", filters.Category)
 	}
 
-	if filters.Type != "" {
-		query = query.Where("type = ?", filters.Type)
-	}
-
 	if filters.IsActive != nil {
 		query = query.Where("is_active = ?", *filters.IsActive)
 	}
@@ -252,9 +248,6 @@ func CreateMCPTool(c *gin.Context) {
 	if req.Config == nil {
 		req.Config = []byte("{}")
 	}
-	if req.Permissions == nil {
-		req.Permissions = []byte("[\"read\"]")
-	}
 
 	// 设置默认配置类型
 	configType := int8(ConfigTypeStreamableHTTP) // 默认为streamable_http配置
@@ -269,10 +262,8 @@ func CreateMCPTool(c *gin.Context) {
 		McpName:     req.McpName, // 新增：MCP工具标识
 		Description: req.Description,
 		Category:    req.Category,
-		Type:        req.Type,
 		ConfigType:  configType, // 新增：配置类型
 		Config:      req.Config,
-		Permissions: req.Permissions,
 		IsActive:    true,
 	}
 
@@ -498,17 +489,11 @@ func UpdateMCPTool(c *gin.Context) {
 	if req.Category != nil {
 		updates["category"] = *req.Category
 	}
-	if req.Type != nil {
-		updates["type"] = *req.Type
-	}
 	if req.ConfigType != nil {
 		updates["config_type"] = *req.ConfigType
 	}
 	if req.Config != nil {
 		updates["config"] = req.Config
-	}
-	if req.Permissions != nil {
-		updates["permissions"] = req.Permissions
 	}
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive
@@ -729,9 +714,9 @@ func TestMCPTool(c *gin.Context) {
 		Message:      "工具测试成功",
 		ResponseTime: responseTime,
 		TestResult: map[string]interface{}{
-			"tool_name": tool.Name,
-			"tool_type": tool.Type,
-			"test_time": time.Now().Format("2006-01-02 15:04:05"),
+			"tool_name":     tool.Name,
+			"tool_category": tool.Category,
+			"test_time":     time.Now().Format("2006-01-02 15:04:05"),
 		},
 	}
 
@@ -750,11 +735,6 @@ func GetMCPToolStats(c *gin.Context) {
 	// 按类别统计
 	global.DB.Model(&MCPTool{}).Where("category = 'dootask'").Count(&stats.DooTaskTools)
 	global.DB.Model(&MCPTool{}).Where("category = 'external'").Count(&stats.ExternalTools)
-	global.DB.Model(&MCPTool{}).Where("category = 'custom'").Count(&stats.CustomTools)
-
-	// 按类型统计
-	global.DB.Model(&MCPTool{}).Where("type = 'internal'").Count(&stats.InternalTools)
-	global.DB.Model(&MCPTool{}).Where("type = 'external'").Count(&stats.ExternalTypeTools)
 
 	// TODO: 从调用日志表统计使用数据
 	stats.TotalCalls = 0

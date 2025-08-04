@@ -108,18 +108,6 @@ export default function AgentsPage() {
     }
   };
 
-  // 辅助函数 - 安全获取工具数组
-  const getToolsArray = (tools: unknown): string[] => {
-    if (Array.isArray(tools)) return tools;
-    return [];
-  };
-
-  // 辅助函数 - 安全获取知识库数组
-  const getKnowledgeBasesArray = (knowledgeBases: unknown): string[] => {
-    if (Array.isArray(knowledgeBases)) return knowledgeBases;
-    return [];
-  };
-
   // 统计数据
   const stats = {
     total: agents.length,

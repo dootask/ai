@@ -2,23 +2,23 @@
 
 import { Badge } from '@/components/ui/badge';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useAppContext } from '@/contexts/app-context';
-import { toolCategories, toolPermissions, toolTypes } from '@/lib/ai';
+import { toolCategories } from '@/lib/ai';
 import { agentsApi } from '@/lib/api/agents';
 import { mcpToolsApi } from '@/lib/api/mcp-tools';
 import { Agent, MCPTool } from '@/lib/types';
 import { getAllAgents } from '@/lib/utils';
-import { Bot, Edit, Eye, Settings, Shield, Trash2, Wrench } from 'lucide-react';
+import { Bot, Edit, Eye, Settings, Trash2, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -211,7 +211,7 @@ export default function MCPToolDetailPage() {
             </Badge>
           </div>
           <p className="text-muted-foreground max-w-2xl">{tool.description}</p>
-          <p className="text-muted-foreground">类型：{toolTypes.find(type => type.value === tool.type)?.label}</p>
+
         </div>
         <div className="flex gap-3">
           {/* todo: 测试工具 */}
@@ -269,10 +269,7 @@ export default function MCPToolDetailPage() {
                     <p className="text-sm">{currentCategory.label}</p>
                   </div>
                 </div>
-                <div>
-                  <h4 className="text-muted-foreground text-sm font-medium">工具类型</h4>
-                  <p className="text-sm">{toolTypes.find(type => type.value === tool.type)?.label}</p>
-                </div>
+
                 <div>
                   <h4 className="text-muted-foreground text-sm font-medium">状态</h4>
                   <Badge variant={tool.isActive ? 'default' : 'secondary'}>{tool.isActive ? '活跃' : '停用'}</Badge>
@@ -333,23 +330,7 @@ export default function MCPToolDetailPage() {
           </Card>
 
           {/* 权限设置 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                权限设置
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {tool.permissions.map(permission => (
-                  <Badge key={permission} variant="outline">
-                    {toolPermissions.find(item => item.value === permission)?.label || permission}
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+
         </div>
 
         {/* 右侧状态和设置 */}

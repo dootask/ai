@@ -3,12 +3,12 @@
 import { CommandSelect, CommandSelectOption } from '@/components/command-select';
 import { Badge } from '@/components/ui/badge';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +17,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Textarea } from '@/components/ui/textarea';
-import { embeddingModels, toolCategories, toolTypes } from '@/lib/ai';
+import { embeddingModels, toolCategories } from '@/lib/ai';
 import { agentsApi, formatUpdateRequestForAPI } from '@/lib/api/agents';
 import { aiModelsApi } from '@/lib/api/ai-models';
 import { knowledgeBasesApi } from '@/lib/api/knowledge-bases';
@@ -395,9 +395,6 @@ export default function EditAgentPage() {
                         <div className="mt-1 flex gap-1">
                           <span className="bg-secondary text-secondary-foreground rounded px-2 py-0.5 text-xs">
                             {toolCategories.find(category => category.value === tool.category)?.label || tool.category}
-                          </span>
-                          <span className="bg-secondary text-secondary-foreground rounded px-2 py-0.5 text-xs">
-                            {toolTypes.find(type => type.value === tool.type)?.label || tool.type}
                           </span>
                         </div>
                       </div>

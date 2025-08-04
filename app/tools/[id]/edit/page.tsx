@@ -2,22 +2,21 @@
 
 import { CommandSelect } from '@/components/command-select';
 import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { toolCategories, toolPermissions, toolTypes } from '@/lib/ai';
+import { toolCategories } from '@/lib/ai';
 import { mcpToolsApi, type MCPToolFormData } from '@/lib/api/mcp-tools';
-import { Save, Settings, Shield, Wrench } from 'lucide-react';
+import { Save, Settings, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -27,10 +26,8 @@ interface FormData {
   name: string;
   mcp_name: string; // 修复：使用后端字段名mcp_name
   description?: string;
-  category: 'dootask' | 'external' | 'custom';
-  type: 'internal' | 'external';
+  category: 'dootask' | 'external';
   config: Record<string, unknown>;
-  permissions: string[];
   configType: 'streamable_http' | 'websocket' | 'sse' | 'stdio'; // 扩展为四种方式
   configJson?: string; // 统一配置信息为JSON格式
 }
@@ -40,14 +37,13 @@ export default function EditMCPToolPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [originalConfigType, setOriginalConfigType] = useState<string>('streamable_http');
   const [formData, setFormData] = useState<FormData>({
     name: '',
     mcp_name: '', // 新增：MCP工具标识
     description: '',
     category: 'external',
-    type: 'external',
     config: {},
-    permissions: ['read'],
     configType: 'streamable_http', // 默认streamable_http方式
     configJson: '', // 统一配置信息为JSON格式
   });
@@ -59,14 +55,13 @@ export default function EditMCPToolPage() {
         const toolId = params.id as string;
         const tool = await mcpToolsApi.get(toolId);
 
+        setOriginalConfigType(tool.configTypeName || 'streamable_http');
         setFormData({
           name: tool.name || '',
           mcp_name: tool.mcpName || '', // 新增：MCP工具标识
           description: tool.description || '',
           category: tool.category || 'external',
-          type: tool.type || 'external',
           config: tool.config || {},
-          permissions: tool.permissions || ['read'],
           configType: tool.configTypeName || 'streamable_http', // 修复：使用configTypeName字段
           configJson: tool.configJson || '{}', // 统一配置信息为JSON格式，提供默认值
         });
@@ -93,18 +88,13 @@ export default function EditMCPToolPage() {
       return;
     }
 
-    if (!formData.permissions || formData.permissions.length === 0) {
-      toast.error('请至少选择一个权限');
-      return;
-    }
-
     // 验证配置JSON格式并解析
     let parsedConfig: Record<string, unknown> = {};
     if (formData.configJson) {
       try {
         parsedConfig = JSON.parse(formData.configJson);
       } catch (error) {
-        console.error('配置JSON格式错误:', error);
+        console.error('Failed to parse config JSON:', error);
         toast.error('配置JSON格式错误，请检查语法');
         return;
       }
@@ -113,39 +103,36 @@ export default function EditMCPToolPage() {
     setIsLoading(true);
 
     try {
+      const toolId = params.id as string;
       // 构建表单数据用于API调用
       const toolFormData: MCPToolFormData = {
         name: formData.name,
         mcpName: formData.mcp_name, // 新增：MCP工具标识
         description: formData.description || '',
         category: formData.category,
-        type: formData.type,
-        config: parsedConfig, // 使用解析后的配置，而不是原始config
-        permissions: formData.permissions,
+        config: parsedConfig, // 使用解析后的配置
         configType: formData.configType, // 新增：配置方式
         configJson: formData.configJson, // 统一配置信息为JSON格式
       };
 
-      await mcpToolsApi.update(params.id as string, toolFormData);
-      toast.success(`MCP 工具 "${formData.name}" 更新成功！`);
+      const updatedTool = await mcpToolsApi.update(toolId, toolFormData);
+      toast.success(`MCP 工具 "${updatedTool.name}" 更新成功！`);
       router.push('/tools');
-    } catch {
+    } catch (error) {
+      console.error('Failed to update tool:', error);
       toast.error('更新 MCP 工具失败');
+    } finally {
       setIsLoading(false);
     }
-  };
-
-  const handlePermissionToggle = (permission: string, checked: boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      permissions: checked ? [...prev.permissions!, permission] : prev.permissions!.filter(p => p !== permission),
-    }));
   };
 
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"></div>
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto mb-4"></div>
+          <p className="text-muted-foreground">加载中...</p>
+        </div>
       </div>
     );
   }
@@ -169,9 +156,9 @@ export default function EditMCPToolPage() {
 
       {/* 页面标题 */}
       <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-1">
+        <div>
           <h1 className="text-3xl font-bold tracking-tight">编辑 MCP 工具</h1>
-          <p className="text-muted-foreground">修改 MCP 工具的配置和设置</p>
+          <p className="text-muted-foreground">修改 MCP 工具的配置信息</p>
         </div>
         <div className="flex gap-3">
           <Button type="button" variant="outline" asChild>
@@ -233,41 +220,22 @@ export default function EditMCPToolPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <Label htmlFor="category">工具类别 *</Label>
-                    <CommandSelect
-                      options={toolCategories.map(category => ({
-                        value: category.value,
-                        label: category.label,
-                        description: category.description,
-                      }))}
-                      value={formData.category}
-                      onValueChange={value =>
-                        setFormData(prev => ({ ...prev, category: value as 'dootask' | 'external' | 'custom' }))
-                      }
-                      placeholder="选择工具类别"
-                      searchPlaceholder="搜索类别..."
-                      emptyMessage="没有找到相关类别"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="type">工具类型 *</Label>
-                    <CommandSelect
-                      options={toolTypes.map(type => ({
-                        value: type.value,
-                        label: type.label,
-                        description: type.description,
-                      }))}
-                      value={formData.type}
-                      onValueChange={value =>
-                        setFormData(prev => ({ ...prev, type: value as 'internal' | 'external' }))
-                      }
-                      placeholder="选择工具类型"
-                      searchPlaceholder="搜索类型..."
-                      emptyMessage="没有找到相关类型"
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="category">工具类别 *</Label>
+                  <CommandSelect
+                    options={toolCategories.map(category => ({
+                      value: category.value,
+                      label: category.label,
+                      description: category.description,
+                    }))}
+                    value={formData.category}
+                    onValueChange={value =>
+                      setFormData(prev => ({ ...prev, category: value as 'dootask' | 'external' }))
+                    }
+                    placeholder="选择工具类别"
+                    searchPlaceholder="搜索类别..."
+                    emptyMessage="没有找到相关类别"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -311,8 +279,10 @@ export default function EditMCPToolPage() {
                           setFormData(prev => ({
                             ...prev,
                             configType: newConfigType,
-                            // 清空之前的配置
-                            configJson: '',
+                            // 如果切换到原有配置方式，保持配置；否则清空
+                            configJson: newConfigType === originalConfigType 
+                              ? (prev.configJson || JSON.stringify(prev.config || {}, null, 2))
+                              : '',
                           }));
                         }}
                         className="h-4 w-4"
@@ -331,8 +301,10 @@ export default function EditMCPToolPage() {
                           setFormData(prev => ({
                             ...prev,
                             configType: newConfigType,
-                            // 清空之前的配置
-                            configJson: '',
+                            // 如果切换到原有配置方式，保持配置；否则清空
+                            configJson: newConfigType === originalConfigType 
+                              ? (prev.configJson || JSON.stringify(prev.config || {}, null, 2))
+                              : '',
                           }));
                         }}
                         className="h-4 w-4"
@@ -351,8 +323,10 @@ export default function EditMCPToolPage() {
                           setFormData(prev => ({
                             ...prev,
                             configType: newConfigType,
-                            // 清空之前的配置
-                            configJson: '',
+                            // 如果切换到原有配置方式，保持配置；否则清空
+                            configJson: newConfigType === originalConfigType 
+                              ? (prev.configJson || JSON.stringify(prev.config || {}, null, 2))
+                              : '',
                           }));
                         }}
                         className="h-4 w-4"
@@ -371,8 +345,10 @@ export default function EditMCPToolPage() {
                           setFormData(prev => ({
                             ...prev,
                             configType: newConfigType,
-                            // 清空之前的配置
-                            configJson: '',
+                            // 如果切换到原有配置方式，保持配置；否则清空
+                            configJson: newConfigType === originalConfigType 
+                              ? (prev.configJson || JSON.stringify(prev.config || {}, null, 2))
+                              : '',
                           }));
                         }}
                         className="h-4 w-4"
@@ -418,71 +394,30 @@ export default function EditMCPToolPage() {
 
         {/* 右侧配置 */}
         <div className="space-y-6">
-          {/* 权限设置 */}
-          <Card>
+          {/* 示例配置 */}
+          <Card className="border-gray-200 bg-gray-50">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                权限设置
-              </CardTitle>
-              <CardDescription>设置工具的访问权限</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {toolPermissions.map(permission => (
-                  <div key={permission.value} className="flex items-start space-x-3 rounded-lg border p-3">
-                    <Checkbox
-                      id={`permission-${permission.value}`}
-                      checked={formData.permissions?.includes(permission.value) || false}
-                      onCheckedChange={(checked: boolean) => handlePermissionToggle(permission.value, checked)}
-                      className="mt-0.5"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <Label htmlFor={`permission-${permission.value}`} className="text-sm font-medium">
-                        {permission.label}
-                      </Label>
-                      <p className="text-muted-foreground mt-1 text-xs">{permission.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
-                <div className="flex items-start gap-2">
-                  <div className="mt-2 h-2 w-2 flex-shrink-0 rounded-full bg-blue-500"></div>
-                  <div className="text-sm">
-                    <p className="font-medium text-blue-900">权限说明</p>
-                    <p className="mt-1 text-blue-800">权限控制智能体可以对工具执行的操作类型。建议遵循最小权限原则。</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 编辑注意事项 */}
-          <Card className="border-amber-200 bg-amber-50">
-            <CardHeader>
-              <CardTitle className="text-amber-900">编辑注意事项</CardTitle>
+              <CardTitle className="text-gray-900">常见工具示例</CardTitle>
             </CardHeader>
             <CardContent className="text-sm">
-              <ul className="space-y-2 text-amber-800">
-                <li className="flex items-start gap-2">
-                  <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500"></span>
-                  <span>更改工具配置可能影响正在使用的智能体</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500"></span>
-                  <span>建议先测试工具连接后再保存</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500"></span>
-                  <span>权限变更会立即生效</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-amber-500"></span>
-                  <span>删除权限前确认智能体使用情况</span>
-                </li>
-              </ul>
+              <div className="space-y-3">
+                <div>
+                  <p className="font-medium text-gray-900">天气查询</p>
+                  <p className="text-xs text-gray-600">类别: 外部工具</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">邮件发送</p>
+                  <p className="text-xs text-gray-600">类别: 外部工具</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">任务管理</p>
+                  <p className="text-xs text-gray-600">类别: DooTask</p>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">文档搜索</p>
+                  <p className="text-xs text-gray-600">类别: 外部工具</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

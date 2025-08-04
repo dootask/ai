@@ -14,8 +14,7 @@ interface MCPToolQueryParams {
   page?: number;
   page_size?: number;
   search?: string;
-  category?: 'dootask' | 'external' | 'custom';
-  type?: 'internal' | 'external';
+  category?: 'dootask' | 'external';
   is_active?: boolean;
   order_by?: string;
   order_dir?: 'asc' | 'desc';
@@ -41,9 +40,6 @@ interface MCPToolStatsResponse {
   inactive: number;
   dootask_tools: number;
   external_tools: number;
-  custom_tools: number;
-  internal_tools: number;
-  external_type_tools: number;
   total_calls: number;
   avg_response_time: number;
 }
@@ -53,10 +49,8 @@ interface MCPToolResponse {
   id: number; // 后端BIGSERIAL类型返回number
   name: string;
   description?: string | null;
-  category: 'dootask' | 'external' | 'custom';
-  type: 'internal' | 'external';
+  category: 'dootask' | 'external';
   config: Record<string, unknown>;
-  permissions: string[];
   is_active: boolean; // 后端返回的字段名
   created_at: string; // 后端返回的字段名
   updated_at: string; // 后端返回的字段名
@@ -81,10 +75,8 @@ interface MCPToolFormData {
   name: string;
   mcpName: string; // 新增：MCP工具标识
   description?: string;
-  category: 'dootask' | 'external' | 'custom';
-  type: 'internal' | 'external';
+  category: 'dootask' | 'external';
   config?: Record<string, unknown>;
-  permissions?: string[];
   isActive?: boolean;
   // 配置方式 - 扩展为四种方式
   configType: 'streamable_http' | 'websocket' | 'sse' | 'stdio';
@@ -123,9 +115,9 @@ const transformToFrontendFormat = (tool: MCPToolResponse): MCPTool => {
     mcpName: tool.mcp_name || '', // 新增：MCP工具标识
     description: tool.description || '',
     category: tool.category,
-    type: tool.type,
+    type: 'internal', // 类型固定为internal
     config: config,
-    permissions: tool.permissions,
+    permissions: [], // 权限字段移除
     isActive: tool.is_active, // 转换字段名
     createdAt: tool.created_at, // 转换字段名
     updatedAt: tool.updated_at, // 转换字段名
@@ -180,9 +172,9 @@ const transformToBackendFormat = (data: MCPToolFormData): CreateMCPToolRequest |
     mcp_name: data.mcpName, // 修复：使用后端字段名mcp_name
     description: data.description || '',
     category: data.category,
-    type: data.type,
+    type: 'internal', // 类型固定为internal
     config: config, // 使用前端传递的config
-    permissions: data.permissions || [],
+    permissions: [], // 权限字段移除
     config_type: configType, // 设置配置类型
   };
 

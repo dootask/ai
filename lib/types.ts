@@ -278,10 +278,8 @@ export interface MCPTool {
   name: string;
   mcpName: string; // 新增：MCP工具标识
   description: string;
-  category: 'dootask' | 'external' | 'custom';
-  type: 'internal' | 'external';
+  category: 'dootask' | 'external';
   config: Record<string, unknown>;
-  permissions: string[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
