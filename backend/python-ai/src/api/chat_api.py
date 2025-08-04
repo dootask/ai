@@ -1,12 +1,11 @@
 import logging
 from typing import Any
 
+from agents import DEFAULT_AGENT
+from api import encrypt, is_from_swagger, verify_bearer
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from langsmith import Client as LangsmithClient
-
-from agents import DEFAULT_AGENT
-from api import verify_bearer
 from schema import (ChatHistory, ChatHistoryInput, ChatMessage, Feedback,
                     FeedbackResponse, StreamInput, UserInput)
 from service.chat_service import ChatService
@@ -31,6 +30,12 @@ async def invoke(request: Request, user_input: UserInput, agent_id: str = DEFAUL
     使用 thread_id 来持久化和继续多轮对话。run_id 参数也会附加到消息中用于记录反馈。
     使用 user_id 来在多个线程间持久化和继续对话。
     """
+    if is_from_swagger(request.headers.get("referer", "")):
+        user_input.agent_config["api_key"] = encrypt(user_input.agent_config.get("api_key"))
+        for rag_config in user_input.rag_config:
+            if rag_config.get("api_key"):
+                rag_config["api_key"] = encrypt(rag_config.get("api_key"))
+        
     try:
         callback = None
         if getattr(request.app.state, 'langfuse_handler', None):
@@ -74,6 +79,12 @@ async def stream(
     
     设置 `stream_tokens=false` 来返回中间消息但不逐令牌返回。
     """
+    if is_from_swagger(request.headers.get("referer", "")):
+        user_input.agent_config["api_key"] = encrypt(user_input.agent_config.get("api_key"))
+        for rag_config in user_input.rag_config:
+            if rag_config.get("api_key"):
+                rag_config["api_key"] = encrypt(rag_config.get("api_key"))
+        
     callback = None
     if getattr(request.app.state, 'langfuse_handler', None):
         callback = request.app.state.langfuse_handler

@@ -15,8 +15,10 @@ from langchain_google_vertexai import ChatVertexAI
 from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
-from langchain_xai import ChatXAI
 from langchain_qwq import ChatQwQ
+from langchain_xai import ChatXAI
+from service.utils import decrypt
+
 
 class FakeToolModel(FakeListChatModel):
     def __init__(self, responses: list[str]):
@@ -202,6 +204,8 @@ PROVIDER_MODEL_MAPPING = {
     },
 }
 
+
+
 @cache
 def get_model_by_provider(
     provider_name: str, 
@@ -252,6 +256,8 @@ def get_model_by_provider(
             model_params[config_key] = model_name
         elif config_key == "openai_proxy":
             model_params[config_key] = cfg("proxy_url")
+        elif config_key == "api_key":
+            model_params[config_key] = decrypt(cfg("api_key"))
         else:
             value = cfg(config_key)
             if value is not None:

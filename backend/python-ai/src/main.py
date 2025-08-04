@@ -105,4 +105,4 @@ if __name__ == "__main__":
     import uvicorn
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    uvicorn.run("main:app", host="127.0.0.1", port=8005,reload=settings.is_dev())
+    uvicorn.run("main:app", host="127.0.0.1", port=8005,reload=settings.is_dev(),env_file="../.env")

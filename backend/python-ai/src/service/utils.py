@@ -1,6 +1,10 @@
-from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
+from base64 import b64decode, b64encode
+
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
+from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.messages import ChatMessage as LangchainChatMessage
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from schema import ChatMessage
 
 
@@ -75,3 +79,17 @@ def remove_tool_calls(content: str | list[str | dict]) -> str | list[str | dict]
         for content_item in content
         if isinstance(content_item, str) or content_item["type"] != "tool_use"
     ]
+
+def decrypt(encoded):
+    # 延迟导入以避免循环导入问题
+    from core import settings
+    
+    if not settings.API_KEY:
+        return encoded
+
+    raw = b64decode(encoded)
+    nonce = raw[:12]
+    ciphertext = raw[12:]
+    cipher = AES.new(settings.API_KEY.encode('utf-8'), AES.MODE_GCM, nonce=nonce)
+    decrypted = cipher.decrypt_and_verify(ciphertext[:-16], ciphertext[-16:])
+    return decrypted.decode()
