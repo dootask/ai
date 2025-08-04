@@ -5,6 +5,8 @@ from Crypto.Cipher import AES
 
 
 def decrypt(encoded):
+    if not settings.API_KEY:
+        return encoded
     raw = b64decode(encoded)
     nonce = raw[:12]
     ciphertext = raw[12:]
