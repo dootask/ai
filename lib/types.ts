@@ -226,16 +226,17 @@ export interface KnowledgeBase {
   id: number; // 后端返回number类型
   name: string;
   description?: string | null;
-  embedding_model: string; // 后端字段名
+  embedding_model: string; // 嵌入模型
   chunk_size: number;
   chunk_overlap: number;
   provider: string; // 新增
   proxy_url?: string | null; // 新增
   metadata: unknown; // JSONB字段
-  is_active: boolean; // 后端字段名
-  created_at: string; // 后端字段名
-  updated_at: string; // 后端字段名
-  documents_count?: number; // 后端字段名
+  is_active: boolean; // 是否激活
+  created_at: string; // 创建时间
+  updated_at: string; // 更新时间
+  documents_count?: number; // 文档数量
+  api_key?: string | null; // 知识库API密钥
 }
 
 export interface Document {
@@ -521,18 +522,19 @@ export interface AgentDetail extends Agent {
 // 知识库文档类型
 export interface KnowledgeBaseDocument {
   id: number; // 后端返回number类型
-  knowledge_base_id: number; // 后端字段名
-  title: string; // 后端字段名
-  content: string;
-  file_path?: string | null;
-  file_type: string; // 后端字段名
-  file_size: number; // 后端字段名
-  metadata: unknown; // JSONB字段
-  chunk_index: number;
-  parent_doc_id?: number | null;
+  knowledge_base_id: number; // 知识库ID
+  title: string; // 文档标题
+  content: string; // 文档内容
+  file_path?: string | null; // 文件路径
+  file_type: string; // 文件类型
+  file_size: number; // 文件大小
+  metadata: unknown; // 元数据
+  chunk_index: number; // 分块索引
+  parent_doc_id?: number | null; // 父文档ID
   status: 'processed' | 'processing' | 'failed'; // 处理状态
-  is_active: boolean; // 后端字段名
-  created_at: string; // 后端字段名
-  updated_at: string; // 后端字段名
-  chunks_count?: number; // 后端字段名
+  is_active: boolean; // 是否激活
+  created_at: string; // 创建时间
+  updated_at: string; // 更新时间
+  chunks_count?: number; // 分块数量
+  api_key?: string | null; // 知识库API密钥
 }

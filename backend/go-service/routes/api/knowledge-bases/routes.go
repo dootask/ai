@@ -13,6 +13,8 @@ import (
 	"dootask-ai/go-service/global"
 	"dootask-ai/go-service/utils"
 
+	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/duke-git/lancet/v2/cryptor"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"gorm.io/gorm"
@@ -204,6 +206,15 @@ func CreateKnowledgeBase(c *gin.Context) {
 		req.Metadata = []byte("{}")
 	}
 
+	apiKey := ""
+	if req.ApiKey != nil {
+		apiKey = *req.ApiKey
+		appKey := utils.GetEnvWithDefault("API_KEY", "")
+		if appKey != "" {
+			apiKey = convertor.ToStdBase64(string(cryptor.AesGcmEncrypt([]byte(*req.ApiKey), []byte(appKey))))
+		}
+	}
+
 	// 创建知识库
 	kb := KnowledgeBase{
 		UserID:         int64(global.DooTaskUser.UserID),
@@ -212,13 +223,8 @@ func CreateKnowledgeBase(c *gin.Context) {
 		EmbeddingModel: req.EmbeddingModel,
 		ChunkSize:      req.ChunkSize,
 		ChunkOverlap:   req.ChunkOverlap,
-		ApiKey: func() string {
-			if req.ApiKey != nil {
-				return *req.ApiKey
-			}
-			return ""
-		}(),
-		Provider: req.Provider, // 新增
+		ApiKey:         apiKey,
+		Provider:       req.Provider, // 新增
 		ProxyURL: func() string {
 			if req.ProxyURL != nil {
 				return *req.ProxyURL
@@ -308,6 +314,11 @@ func GetKnowledgeBase(c *gin.Context) {
 	global.DB.Where("knowledge_base_id = ? AND is_active = true", id).
 		Order("created_at DESC").
 		First(&lastUpload)
+
+	// 隐藏敏感信息
+	if kb.ApiKey != "" {
+		kb.ApiKey = "***"
+	}
 
 	// 构造响应
 	response := KnowledgeBaseResponse{
@@ -417,7 +428,12 @@ func UpdateKnowledgeBase(c *gin.Context) {
 		updateData["chunk_overlap"] = *req.ChunkOverlap
 	}
 	if req.ApiKey != nil {
-		updateData["api_key"] = *req.ApiKey
+		apiKey := *req.ApiKey
+		appKey := utils.GetEnvWithDefault("API_KEY", "")
+		if appKey != "" {
+			apiKey = convertor.ToStdBase64(string(cryptor.AesGcmEncrypt([]byte(*req.ApiKey), []byte(appKey))))
+		}
+		updateData["api_key"] = &apiKey
 	}
 	if req.Provider != nil {
 		updateData["provider"] = *req.Provider

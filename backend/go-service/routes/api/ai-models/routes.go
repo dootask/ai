@@ -8,6 +8,8 @@ import (
 	"dootask-ai/go-service/utils"
 	"net/http"
 
+	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/duke-git/lancet/v2/cryptor"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"gorm.io/gorm"
@@ -270,13 +272,20 @@ func (h *Handler) CreateAIModel(c *gin.Context) {
 		}
 	}
 
+	// 加密api_key
+	apiKey := *req.ApiKey
+	appKey := utils.GetEnvWithDefault("API_KEY", "")
+	if appKey != "" {
+		apiKey = convertor.ToStdBase64(string(cryptor.AesGcmEncrypt([]byte(*req.ApiKey), []byte(appKey))))
+	}
+
 	// 创建模型
 	model := AIModel{
 		UserID:      int64(global.DooTaskUser.UserID),
 		Name:        req.Name,
 		Provider:    req.Provider,
 		ModelName:   req.ModelName,
-		ApiKey:      req.ApiKey,
+		ApiKey:      &apiKey,
 		BaseURL:     req.BaseURL,
 		ProxyURL:    req.ProxyURL,
 		MaxTokens:   req.MaxTokens,
@@ -395,7 +404,12 @@ func (h *Handler) UpdateAIModel(c *gin.Context) {
 		updates["model_name"] = *req.ModelName
 	}
 	if req.ApiKey != nil {
-		updates["api_key"] = *req.ApiKey
+		apiKey := *req.ApiKey
+		appKey := utils.GetEnvWithDefault("API_KEY", "")
+		if appKey != "" {
+			apiKey = convertor.ToStdBase64(string(cryptor.AesGcmEncrypt([]byte(*req.ApiKey), []byte(appKey))))
+		}
+		updates["api_key"] = &apiKey
 	}
 	if req.BaseURL != nil {
 		updates["base_url"] = *req.BaseURL

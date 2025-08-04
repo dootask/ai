@@ -2,12 +2,12 @@
 
 import { CommandSelect, CommandSelectOption } from '@/components/command-select';
 import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { embeddingModels } from '@/lib/ai';
 import { knowledgeBasesApi } from '@/lib/api/knowledge-bases';
+import { KnowledgeBase } from '@/lib/types';
 import { Database, Save, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -40,6 +41,7 @@ export default function EditKnowledgeBasePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [model, setModel] = useState<KnowledgeBase | null>(null);
   const [formData, setFormData] = useState<KnowledgeBaseFormData>({
     name: '',
     description: '',
@@ -64,13 +66,14 @@ export default function EditKnowledgeBasePage() {
       const kb = await knowledgeBasesApi.get(kbId);
       const formattedKB = kb;
 
+      setModel(formattedKB);
+
       setFormData({
         name: formattedKB.name || '',
         description: formattedKB.description || '',
         embeddingModel: formattedKB.embedding_model,
         chunkSize: formattedKB.chunk_size || 1000,
         chunkOverlap: formattedKB.chunk_overlap || 200,
-        apiKey: '', // API密钥留空，因为后端不再返回
         proxyUrl: formattedKB.proxy_url || '', // 新增
         isActive: formattedKB.is_active,
       });
@@ -278,8 +281,8 @@ export default function EditKnowledgeBasePage() {
                   <Input
                     id="apiKey"
                     type="password"
-                    placeholder="输入 API 密钥（可选）"
-                    value={formData.apiKey || ''}
+                    placeholder={model?.api_key ? '***已配置***' : 'sk-... 或其他API密钥'}
+                    value={formData?.apiKey || ''}
                     onChange={e => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
                   />
                   <p className="text-muted-foreground text-xs">用于访问特定 Embedding 模型的 API 密钥，如果模型需要的话</p>

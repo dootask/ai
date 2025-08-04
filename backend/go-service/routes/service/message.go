@@ -140,14 +140,16 @@ func (h *MessageHandler) parseErrorContent(content string) (*StreamErrorData, er
 // handleErrorMessage 处理error类型消息
 func (h *MessageHandler) handleErrorMessage(v StreamLineData, req WebhookRequest, w io.Writer, status int) {
 	if content, ok := v.Content.(string); ok {
+		processedErrorMsg := ""
 		StreamErrorData, err := h.parseErrorContent(content)
 		if err != nil {
+			processedErrorMsg = err.Error()
 			logError("错误消息解析失败", err, "type:", v.Type)
-			return
+		} else {
+			processedErrorMsg = h.processHTMLContent(StreamErrorData.Error.Message)
 		}
 
 		// 处理可能包含HTML的错误消息
-		processedErrorMsg := h.processHTMLContent(StreamErrorData.Error.Message)
 
 		h.sendSSEResponse(w, req, "done", processedErrorMsg)
 		h.createMessage(CreateMessage{
