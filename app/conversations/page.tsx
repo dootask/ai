@@ -4,24 +4,25 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
+import { FloatingLoading } from '@/components/loading';
 import MessageContent from '@/components/message-content';
 import { useDebounceCallback } from '@/hooks/use-debounce';
 import { agentsApi } from '@/lib/api/agents';
 import { fetchConversations, fetchMessages } from '@/lib/api/conversations';
 import { Agent, Conversation, Message, PaginationBase } from '@/lib/types';
 import { Bot, Calendar, CheckCircle, Clock, Eye, Filter, MessageSquare, Search, TrendingUp, User } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { defaultPagination, Pagination } from '../../components/pagination';
 
 export default function ConversationsPage() {
@@ -30,7 +31,10 @@ export default function ConversationsPage() {
   const [pagination, setPagination] = useState<PaginationBase>(defaultPagination);
   const [selectedAgent, setSelectedAgent] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isFilterLoading, setIsFilterLoading] = useState(false);
+  const [loadingTimeout, setLoadingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const isInitialMount = useRef(true);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [conversationMessages, setConversationMessages] = useState<Message[]>([]);
   const [statistics, setStatistics] = useState({
@@ -43,8 +47,24 @@ export default function ConversationsPage() {
   const [error, setError] = useState<string | null>(null);
 
   // 加载对话列表
-  const loadData = useDebounceCallback(async () => {
-    setIsLoading(true);
+  const loadData = useDebounceCallback(async (isFilter = false) => {
+    // 清除之前的timeout
+    if (loadingTimeout) {
+      clearTimeout(loadingTimeout);
+      setLoadingTimeout(null);
+    }
+
+    // 如果是筛选操作且不是首次加载，设置200ms延迟显示loading
+    let currentTimeout: NodeJS.Timeout | null = null;
+    if (isFilter && !isInitialMount.current) {
+      currentTimeout = setTimeout(() => {
+        setIsFilterLoading(true);
+      }, 200);
+      setLoadingTimeout(currentTimeout);
+    } else if (isInitialMount.current) {
+      setIsInitialLoading(true);
+    }
+
     setError('');
 
     try {
@@ -84,7 +104,18 @@ export default function ConversationsPage() {
       setConversations([]);
       setStatistics({ total: 0, today: 0, averageMessages: 0, averageResponseTime: 0, successRate: 0 });
     } finally {
-      setIsLoading(false);
+      // 清除loading timeout
+      if (currentTimeout) {
+        clearTimeout(currentTimeout);
+        setLoadingTimeout(null);
+      }
+      
+      if (isFilter && !isInitialMount.current) {
+        setIsFilterLoading(false);
+      } else if (isInitialMount.current) {
+        setIsInitialLoading(false);
+        isInitialMount.current = false;
+      }
     }
   }, [selectedAgent, searchQuery, pagination.current_page, pagination.page_size]);
 
@@ -134,12 +165,21 @@ export default function ConversationsPage() {
     loadAgents();
   }, [loadAgents]);
 
+  // 清理timeout
+  useEffect(() => {
+    return () => {
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+      }
+    };
+  }, [loadingTimeout]);
+
   const handleViewConversation = async (conversation: Conversation) => {
     setSelectedConversation(conversation);
     await loadConversationMessages(conversation.id);
   };
 
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
@@ -171,7 +211,7 @@ export default function ConversationsPage() {
           <h1 className="text-3xl font-bold tracking-tight">对话监控</h1>
           <p className="text-muted-foreground">查看和分析 AI 处理的对话记录</p>
         </div>
-        <Button onClick={loadData} variant="outline" size="sm">
+        <Button onClick={() => loadData(true)} variant="outline" size="sm">
           刷新数据
         </Button>
       </div>
@@ -240,6 +280,7 @@ export default function ConversationsPage() {
                   setSearchQuery('');
                   setSelectedAgent(value);
                   setPagination(prev => ({ ...prev, current_page: 1 }));
+                  loadData(true);
                 }}
               >
                 <SelectTrigger>
@@ -286,7 +327,7 @@ export default function ConversationsPage() {
               <MessageSquare className="mx-auto mb-4 h-12 w-12 text-red-500" />
               <h3 className="mb-2 text-lg font-medium text-red-600">加载失败</h3>
               <p className="text-muted-foreground">{error}</p>
-              <Button onClick={loadData} variant="outline" className="mt-4">
+              <Button onClick={() => loadData(true)} variant="outline" className="mt-4">
                 重试
               </Button>
             </div>
@@ -439,6 +480,9 @@ export default function ConversationsPage() {
         onPageChange={handlePageChange}
         onPageSizeChange={handlePageSizeChange}
       />
+
+      {/* 筛选loading浮窗 */}
+      <FloatingLoading show={isFilterLoading} message="正在筛选对话记录..." />
     </div>
   );
 }
