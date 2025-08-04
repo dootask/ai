@@ -2,18 +2,20 @@ import json
 import math
 import re
 import time
+
 st= time.time()
+import asyncio
+
 import numexpr
 from core import settings
 # from langchain_openai import OpenAIEmbeddings
 from core.embeddings import get_embeddings_by_provider
+from langchain.retrievers import MergerRetriever
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool, tool
 from langchain_postgres import PGVector
-from langchain_core.runnables import RunnableConfig
-import asyncio
-from langchain.retrievers import (
-    MergerRetriever,
-)
+
+
 def calculator_func(expression: str) -> str:
     """Calculates a math expression using numexpr.
 
@@ -78,7 +80,7 @@ def load_postgres_vectorstore(knowledge_base: list[str] = ["default_knowledge_ba
                 "proxy_url": embeddings_config.get("proxy_url"),
                 "dimensions": embeddings_config.get("dimensions", None)
             }
-        embeddings = get_embeddings_by_provider(provider, model, tuple(sorted(config.items())))
+        embeddings = get_embeddings_by_provider(provider, model, json.dumps(config))
     except Exception as e:
         raise RuntimeError( "初始化Embeddings失败。请确保已设置相应的API密钥。" ) from e
 

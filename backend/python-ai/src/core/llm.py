@@ -5,6 +5,7 @@ import time
 from functools import cache
 from typing import Optional, TypeAlias
 
+from core.crypto_aesgcm import decrypt
 from langchain_anthropic import ChatAnthropic
 from langchain_aws import ChatBedrock
 from langchain_cohere import ChatCohere
@@ -17,7 +18,6 @@ from langchain_ollama import ChatOllama
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langchain_qwq import ChatQwQ
 from langchain_xai import ChatXAI
-from service.utils import decrypt
 
 
 class FakeToolModel(FakeListChatModel):
