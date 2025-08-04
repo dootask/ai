@@ -3,6 +3,7 @@ import os
 from functools import cache
 from typing import Optional, TypeAlias
 
+from core.crypto_aesgcm import decrypt
 from langchain_cohere import CohereEmbeddings
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_google_vertexai import VertexAIEmbeddings
@@ -125,19 +126,21 @@ def get_embeddings_by_provider(
     model_params.update(provider_config["params"])
     
     # 添加映射参数
-    for model_param, config_key in provider_config["param_mapping"].items():
+    for config_key, _ in provider_config["param_mapping"].items():
         if config_key == "model":
-            model_params[model_param] = model_name
+            model_params[config_key] = model_name
         elif config_key == "azure_endpoint":
-            model_params[model_param] = cfg("base_url", None)
-        elif config_key == "deployment":
-            model_params[model_param] = model_name
+            model_params[config_key] = cfg("base_url", None)
+        elif config_key == "deployment_name":
+            model_params[config_key] = model_name
         elif config_key == "openai_proxy":
-            model_params[model_param] = cfg("proxy_url")
+            model_params[config_key] = cfg("proxy_url")
+        elif config_key == "api_key":
+            model_params[config_key] = decrypt(cfg("api_key"))
         else:
             value = cfg(config_key)
             if value is not None:
-                model_params[model_param] = value
+                model_params[config_key] = value
     
     # 添加默认值
     if "default_values" in provider_config:

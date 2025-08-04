@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     MONGO_AUTH_SOURCE: str | None = None
 
     COLLECTION_NAME: str | None = "dootask_ai"
+    API_KEY: str | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property
