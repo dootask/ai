@@ -12,7 +12,6 @@ from langchain_cohere import ChatCohere
 from langchain_community.chat_models import FakeListChatModel
 from langchain_deepseek import ChatDeepSeek
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_google_vertexai import ChatVertexAI
 from langchain_groq import ChatGroq
 from langchain_ollama import ChatOllama
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
@@ -33,7 +32,6 @@ ModelT: TypeAlias = (
     | ChatOpenAI
     | ChatAnthropic
     | ChatGoogleGenerativeAI
-    | ChatVertexAI
     | ChatGroq
     | ChatBedrock
     | ChatOllama

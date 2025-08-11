@@ -6,7 +6,6 @@ from typing import Optional, TypeAlias
 from core.crypto_aesgcm import decrypt
 from langchain_cohere import CohereEmbeddings
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from langchain_google_vertexai import VertexAIEmbeddings
 from langchain_ollama import OllamaEmbeddings
 from langchain_openai import AzureOpenAIEmbeddings, OpenAIEmbeddings
 
@@ -14,7 +13,6 @@ EmbeddingsModelT: TypeAlias = (
     OpenAIEmbeddings
     | AzureOpenAIEmbeddings
     | GoogleGenerativeAIEmbeddings
-    | VertexAIEmbeddings
     | OllamaEmbeddings
     | CohereEmbeddings
 )
