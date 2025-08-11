@@ -1,0 +1,28 @@
+services:
+  ai-agent:
+    image: "dootask-ai:0.1.0"
+    container_name: ai-agent
+    restart: unless-stopped
+
+  ai-agent-postgres:
+    image: pgvector/pgvector:pg15
+    container_name: ai-agent-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "${DB_DATABASE}"
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - ../data/postgres:/var/lib/postgresql/data
+
+  ai-agent-redis:
+    image: redis:7-alpine
+    container_name: ai-agent-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ../data/redis:/data
