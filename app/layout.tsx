@@ -30,7 +30,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                       <SidebarTrigger />
                       <h1 className="text-lg font-semibold">DooTask AI</h1>
                     </div>
-                    <div className="flex-1">{children}</div>
+                    <div className="flex-1 py-8">{children}</div>
                   </main>
                 </div>
               </SidebarProvider>

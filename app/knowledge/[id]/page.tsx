@@ -2,12 +2,12 @@
 
 import { Badge } from '@/components/ui/badge';
 import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -95,7 +95,7 @@ export default function KnowledgeBaseDetailPage() {
           if (typeof agent.knowledge_bases === 'string') {
             kbIds = JSON.parse(agent.knowledge_bases);
           } else if (Array.isArray(agent.knowledge_bases)) {
-            kbIds = agent.knowledge_bases.map(kb => (typeof kb === 'number' ? kb : parseInt(kb.toString())));
+            kbIds = agent.knowledge_bases.map((kb: unknown) => (typeof kb === 'number' ? kb : parseInt(String(kb))));
           }
           return kbIds.includes(knowledgeBase.id);
         } catch {

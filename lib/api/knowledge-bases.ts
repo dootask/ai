@@ -1,13 +1,13 @@
 import axiosInstance from '@/lib/axios';
 import type {
-    CreateKnowledgeBaseRequest,
-    KnowledgeBase,
-    KnowledgeBaseDocument,
-    KnowledgeBaseFilters,
-    KnowledgeBaseListData,
-    PaginationRequest,
-    PaginationResponse,
-    UploadDocumentRequest,
+  CreateKnowledgeBaseRequest,
+  KnowledgeBase,
+  KnowledgeBaseDocument,
+  KnowledgeBaseFilters,
+  KnowledgeBaseListData,
+  PaginationRequest,
+  PaginationResponse,
+  UploadDocumentRequest,
 } from '@/lib/types';
 
 // 知识库响应类型
@@ -41,19 +41,6 @@ interface DocumentFilters {
 // 文档列表数据
 interface DocumentListData {
   items: KnowledgeBaseDocument[];
-}
-
-// 知识库表单数据类型
-interface KnowledgeBaseFormData {
-  name: string;
-  description?: string;
-  embedding_model: string;
-  chunk_size?: number;
-  chunk_overlap?: number;
-  api_key?: string;
-  proxy_url?: string; // 保留：非必填
-  metadata?: Record<string, unknown>;
-  is_active?: boolean;
 }
 
 // 文档表单数据类型

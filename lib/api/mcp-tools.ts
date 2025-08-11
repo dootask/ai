@@ -1,12 +1,12 @@
 import axiosInstance from '@/lib/axios';
 import type {
-    CreateMCPToolRequest,
-    MCPTool,
-    MCPToolFilters,
-    MCPToolListData,
-    PaginationRequest,
-    PaginationResponse,
-    UpdateMCPToolRequest,
+  CreateMCPToolRequest,
+  MCPTool,
+  MCPToolFilters,
+  MCPToolListData,
+  PaginationRequest,
+  PaginationResponse,
+  UpdateMCPToolRequest,
 } from '@/lib/types';
 
 // MCP工具查询参数（保留兼容性）
@@ -115,9 +115,7 @@ const transformToFrontendFormat = (tool: MCPToolResponse): MCPTool => {
     mcpName: tool.mcp_name || '', // 新增：MCP工具标识
     description: tool.description || '',
     category: tool.category,
-    type: 'internal', // 类型固定为internal
     config: config,
-    permissions: [], // 权限字段移除
     isActive: tool.is_active, // 转换字段名
     createdAt: tool.created_at, // 转换字段名
     updatedAt: tool.updated_at, // 转换字段名
@@ -221,9 +219,27 @@ export const mcpToolsApi = {
     });
 
     // 转换后端数据格式为前端格式
+    // 由于后端返回的stats字段类型与前端MCPToolStatsResponse类型不完全一致，这里需要手动转换
+    const backendStats = response.data.data.stats;
+    const transformedStats: MCPToolStatsResponse = {
+      total: backendStats.total ?? 0,
+      active: backendStats.active ?? 0,
+      inactive: backendStats.inactive ?? 0,
+      dootask_tools: backendStats.dootask_tools ?? 0,
+      external_tools: backendStats.external_tools ?? 0,
+      total_calls: backendStats.total_calls ?? 0,
+      avg_response_time: backendStats.avg_response_time ?? 0,
+    };
+
+    // 修复类型不匹配问题，确保 stats 字段包含所有前端定义的属性
     const transformedData: MCPToolListData = {
       items: response.data.data.items.map((tool: MCPToolResponse) => transformToFrontendFormat(tool)),
-      stats: response.data.data.stats,
+      stats: {
+        ...transformedStats,
+        custom_tools: 0,
+        internal_tools: 0,
+        external_type_tools: 0,
+      },
     };
 
     return {

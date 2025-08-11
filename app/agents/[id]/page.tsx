@@ -2,12 +2,12 @@
 
 import { Badge } from '@/components/ui/badge';
 import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,7 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { useAppContext } from '@/contexts/app-context';
 import { agentsApi } from '@/lib/api/agents';
 import { aiModelsApi } from '@/lib/api/ai-models';
-import { AgentResponse, AIModelConfig, KnowledgeBase, MCPTool } from '@/lib/types';
+import { AgentResponse, AIModelConfig } from '@/lib/types';
 import { Bot, Database, Edit, MessageSquare, Settings, Trash2, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -28,8 +28,6 @@ export default function AgentDetailPage() {
   const { Confirm } = useAppContext();
   const [agent, setAgent] = useState<AgentResponse | null>(null);
   const [aiModel, setAiModel] = useState<AIModelConfig | null>(null);
-  const [tools, setTools] = useState<MCPTool[]>([]);
-  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
