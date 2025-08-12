@@ -34,6 +34,7 @@ COPY . .
 # 设置环境变量
 ENV NEXT_PUBLIC_BASE_PATH=/apps/ai-agent
 ENV NEXT_PUBLIC_API_URL=/apps/ai-agent/api
+ENV NEXT_PUBLIC_API_BASE_URL=/apps/ai-agent/api
 ENV NEXT_OUTPUT_MODE=standalone
 
 # 构建项目

@@ -1,12 +1,19 @@
 services:
   ai-agent:
-    image: "dootask-ai:0.1.0"
+    image: "nightcp/ai-agent:0.1.0"
     container_name: ai-agent
     restart: unless-stopped
     environment:
+      TZ: "${TIMEZONE:-PRC}"
+      POSTGRES_DB: "${DB_DATABASE}"
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
       REDIS_HOST: "${REDIS_HOST}"
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
       REDIS_PORT: "${REDIS_PORT}"
+      REDIS_DB: 0
+    volumes:
+      - .env:/web/.env
 
   ai-agent-postgres:
     image: pgvector/pgvector:pg15
