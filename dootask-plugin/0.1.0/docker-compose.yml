@@ -1,6 +1,6 @@
 services:
   ai-agent:
-    image: "nightcp/ai-agent:0.1.0"
+    image: "nightcp/ai-agent:${PLUGIN_VERSION}"
     container_name: ai-agent
     restart: unless-stopped
     environment:
