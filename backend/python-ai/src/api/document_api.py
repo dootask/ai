@@ -1,6 +1,6 @@
 import logging
 
-from api import verify_bearer
+from api import encrypt, verify_bearer, is_from_swagger
 from fastapi import (APIRouter, Depends, File, Form, HTTPException, Query, Request,
                      UploadFile)
 from service.document_service import DocumentService
@@ -13,6 +13,7 @@ router = APIRouter(prefix="/documents", dependencies=[Depends(verify_bearer)],ta
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_documents(
+    request: Request,
     files: list[UploadFile] = File(..., description="要上传的文件列表(支持PDF、TXT、MD、DOC、DOCX)"),
     knowledge_base: str = Form(default="default_knowledge_base",description="目标知识库名称"),
     provider: str = Form(default="openai", description="嵌入模型提供商名称"),
@@ -48,6 +49,9 @@ async def upload_documents(
                     detail=f"不支持的文件类型: {file_extension}。支持的类型: {', '.join(supported_extensions)}"
                 )
     
+    if is_from_swagger(request.headers.get("referer", "")):
+        api_key = encrypt(api_key)
+        
     try:
         document_service = DocumentService(chunk_size,chunk_overlap)
         result = await document_service.upload_documents(files, knowledge_base, provider, model, api_key, proxy_url)

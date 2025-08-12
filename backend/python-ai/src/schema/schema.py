@@ -21,12 +21,15 @@ class ServiceMetadata(BaseModel):
     """Metadata about the service including available agents and models."""
 
     agents: list[AgentInfo] = Field(
+        default=[],
         description="List of available agents.",
     )
     models: list[str] = Field(
+        default=[],
         description="List of available LLMs.",
     )
     default_agent: str = Field(
+        default="chatbot",
         description="Default agent used when none is specified.",
         examples=["research-assistant"],
     )
@@ -96,6 +99,7 @@ class UserInput(BaseModel):
                 "temperature": 0.7,
                 "max_token": None,
                 "prompt": "你是一个聊天助手",
+                "extra": {"model_kwargs":{"stream_options":{"include_usage": True}}}
             }
         ],
     )
@@ -116,17 +120,17 @@ class UserInput(BaseModel):
             }
         ],
     )
-    rag_config: dict[str, Any] = Field(
+    rag_config: list[dict[str, Any]] = Field(
         description = "rag agent request parameters",
         default={},
         examples=[
-            {
+            [{
                 "knowledge_base": ["default_knowledge_base","devops_doc"],
                 "provider": "openai",
                 "model": "text-embedding-3-small",
                 "api_key": "xxxxxxx",
                 "proxy_url": "http://proxy.com"
-            }
+            }]
         ]
     )
 
@@ -227,28 +231,6 @@ class Feedback(BaseModel):  # type: ignore[no-redef]
 
 class FeedbackResponse(BaseModel):
     status: Literal["success"] = "success"
-
-
-class ServiceMetadata(BaseModel):
-    """服务元数据，包括名称、版本等信息"""
-    
-    name: str = Field(
-        description="服务名称",
-        examples=["AI 助手服务"]
-    )
-    version: str = Field(
-        description="服务版本",
-        examples=["1.0.0"]
-    )
-    description: str = Field(
-        description="服务描述",
-        examples=["基于 LangGraph 的智能助手服务"]
-    )
-    available_agents: list[str] = Field(
-        description="可用的代理列表",
-        default=[]
-    )
-
 
 class ChatHistoryInput(BaseModel):
     """Input for retrieving chat history."""

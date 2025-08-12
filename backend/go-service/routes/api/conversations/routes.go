@@ -26,65 +26,7 @@ func RegisterRoutes(router *gin.RouterGroup) {
 		conversationGroup.GET("/:id", GetConversation)        // 获取对话详情
 		conversationGroup.GET("/:id/messages", GetMessages)   // 获取对话消息
 		conversationGroup.GET("/stats", GetConversationStats) // 获取对话统计
-		conversationGroup.GET("/test", TestConversations)     // 测试数据库连接
 	}
-}
-
-// TestConversations 测试对话表查询
-func TestConversations(c *gin.Context) {
-	// 测试基本数据库连接
-	var count int64
-	if err := global.DB.Model(&Conversation{}).Count(&count).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    "DATABASE_001",
-			"message": "数据库连接失败",
-			"data":    err.Error(),
-		})
-		return
-	}
-
-	// 测试基本查询
-	var conversations []Conversation
-	if err := global.DB.Limit(5).Find(&conversations).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    "DATABASE_001",
-			"message": "查询对话表失败",
-			"data":    err.Error(),
-		})
-		return
-	}
-
-	// 测试Agent表关联
-	var agentCount int64
-	if err := global.DB.Table("agents").Count(&agentCount).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    "DATABASE_001",
-			"message": "查询智能体表失败",
-			"data":    err.Error(),
-		})
-		return
-	}
-
-	// 测试Message表关联
-	var messageCount int64
-	if err := global.DB.Table("messages").Count(&messageCount).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"code":    "DATABASE_001",
-			"message": "查询消息表失败",
-			"data":    err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "数据库连接正常",
-		"data": gin.H{
-			"conversations_count":  count,
-			"agents_count":         agentCount,
-			"messages_count":       messageCount,
-			"sample_conversations": conversations,
-		},
-	})
 }
 
 // ListConversations 获取对话列表
@@ -149,7 +91,7 @@ func ListConversations(c *gin.Context) {
 	if filters.Search != "" {
 		searchTerm := "%" + filters.Search + "%"
 		query = query.Joins("LEFT JOIN agents ON conversations.agent_id = agents.id").
-			Where("agents.name ILIKE ? OR conversations.dootask_user_id ILIKE ?", searchTerm, searchTerm)
+			Where("agents.name ILIKE ? ", searchTerm)
 	}
 
 	if filters.AgentID != nil {
@@ -345,7 +287,7 @@ func GetConversation(c *gin.Context) {
 	var avgResponseTimeMs sql.NullFloat64
 	global.DB.Model(&Message{}).
 		Select("AVG(response_time_ms)").
-		Where("conversation_id = ? AND role = 'assistant' AND response_time_ms IS NOT NULL", id).
+		Where("conversation_id = ? AND role = 'assistant' AND response_time_ms > 0", id).
 		Scan(&avgResponseTimeMs)
 
 	var averageResponseTime float64
@@ -532,7 +474,7 @@ func calculateConversationStatistics(userID int64) ConversationStatistics {
 		SELECT avg(m.response_time_ms) FROM agents a
 		LEFT JOIN conversations c ON a.id = c.agent_id
 		LEFT JOIN messages m ON c.id= m.conversation_id
-		WHERE a.user_id = ? AND m.status = 1 AND m.role = 'assistant'
+		WHERE a.user_id = ? AND m.status = 1 AND m.role = 'assistant' AND m.response_time_ms > 0
 	`, global.DooTaskUser.UserID).Scan(&averageResponseTime)
 
 	stats.AverageResponseTime = averageResponseTime.Float64 / 1000.0

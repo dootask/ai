@@ -14,8 +14,7 @@ interface MCPToolQueryParams {
   page?: number;
   page_size?: number;
   search?: string;
-  category?: 'dootask' | 'external' | 'custom';
-  type?: 'internal' | 'external';
+  category?: 'dootask' | 'external';
   is_active?: boolean;
   order_by?: string;
   order_dir?: 'asc' | 'desc';
@@ -41,9 +40,6 @@ interface MCPToolStatsResponse {
   inactive: number;
   dootask_tools: number;
   external_tools: number;
-  custom_tools: number;
-  internal_tools: number;
-  external_type_tools: number;
   total_calls: number;
   avg_response_time: number;
 }
@@ -53,48 +49,88 @@ interface MCPToolResponse {
   id: number; // 后端BIGSERIAL类型返回number
   name: string;
   description?: string | null;
-  category: 'dootask' | 'external' | 'custom';
-  type: 'internal' | 'external';
+  category: 'dootask' | 'external';
   config: Record<string, unknown>;
-  permissions: string[];
   is_active: boolean; // 后端返回的字段名
   created_at: string; // 后端返回的字段名
   updated_at: string; // 后端返回的字段名
+  mcp_name?: string; // 新增：MCP工具标识
+  config_type?: number; // 新增：配置类型 0-streamable_http 1-websocket 2-sse 3-stdio
   // 统计信息
   total_calls?: number;
   today_calls?: number;
   average_response_time?: number;
   success_rate?: number;
   associated_agents?: number;
+  // 新增：配置信息
+  config_info?: {
+    type: number;
+    has_api_key: boolean;
+    config_data: Record<string, unknown>;
+  };
 }
 
 // 前端表单数据类型
 interface MCPToolFormData {
   name: string;
+  mcpName: string; // 新增：MCP工具标识
   description?: string;
-  category: 'dootask' | 'external' | 'custom';
-  type: 'internal' | 'external';
+  category: 'dootask' | 'external';
   config?: Record<string, unknown>;
-  permissions?: string[];
   isActive?: boolean;
-  // 用于前端表单的辅助字段
-  apiKey?: string;
-  baseUrl?: string;
+  // 配置方式 - 扩展为四种方式
+  configType: 'streamable_http' | 'websocket' | 'sse' | 'stdio';
+  // 统一配置信息为JSON格式
+  configJson?: string; // JSON格式的配置信息
 }
 
 // 数据转换函数：后端格式 → 前端格式
 const transformToFrontendFormat = (tool: MCPToolResponse): MCPTool => {
+  // 从config中提取配置信息
+  const config = tool.config || {};
+  
+  // 根据后端的config_type字段判断配置方式
+  // config_type: 0-streamable_http 1-websocket 2-sse 3-stdio
+  let configType: 'streamable_http' | 'websocket' | 'sse' | 'stdio';
+  switch (tool.config_type) {
+    case 1:
+      configType = 'websocket';
+      break;
+    case 2:
+      configType = 'sse';
+      break;
+    case 3:
+      configType = 'stdio';
+      break;
+    default:
+      configType = 'streamable_http';
+  }
+  
+  // 生成配置JSON字符串
+  const configJson = Object.keys(config).length > 0 ? JSON.stringify(config, null, 2) : '{}';
+  
   return {
     id: tool.id.toString(), // 转换为string类型
     name: tool.name,
+    mcpName: tool.mcp_name || '', // 新增：MCP工具标识
     description: tool.description || '',
     category: tool.category,
-    type: tool.type,
-    config: tool.config,
-    permissions: tool.permissions,
+    config: config,
     isActive: tool.is_active, // 转换字段名
     createdAt: tool.created_at, // 转换字段名
     updatedAt: tool.updated_at, // 转换字段名
+    // 新增：配置类型
+    configType: tool.config_type || 0,
+    // 配置方式
+    configTypeName: configType,
+    // 统一配置信息为JSON格式
+    configJson: configJson,
+    // 新增：配置信息
+    configInfo: tool.config_info ? {
+      type: tool.config_info.type,
+      hasApiKey: tool.config_info.has_api_key,
+      configData: tool.config_info.config_data,
+    } : undefined,
     statistics:
       tool.total_calls !== undefined
         ? {
@@ -109,15 +145,46 @@ const transformToFrontendFormat = (tool: MCPToolResponse): MCPTool => {
 
 // 数据转换函数：前端格式 → 后端格式
 const transformToBackendFormat = (data: MCPToolFormData): CreateMCPToolRequest | UpdateMCPToolRequest => {
-  return {
+  // 直接使用前端传递的config，因为前端已经解析了JSON
+  const config: Record<string, unknown> = data.config || {};
+  
+  // 根据配置方式设置config_type
+  let configType: number;
+  switch (data.configType) {
+    case 'websocket':
+      configType = 1;
+      break;
+    case 'sse':
+      configType = 2;
+      break;
+    case 'stdio':
+      configType = 3;
+      break;
+    default:
+      configType = 0; // streamable_http
+  }
+
+  // 构建基础请求对象
+  const baseRequest = {
     name: data.name,
-    description: data.description,
+    mcp_name: data.mcpName, // 修复：使用后端字段名mcp_name
+    description: data.description || '',
     category: data.category,
-    type: data.type,
-    config: data.config || {},
-    permissions: data.permissions || [],
-    isActive: data.isActive,
+    type: 'internal', // 类型固定为internal
+    config: config, // 使用前端传递的config
+    permissions: [], // 权限字段移除
+    config_type: configType, // 设置配置类型
   };
+
+  // 如果是更新请求，添加isActive字段
+  if (data.isActive !== undefined) {
+    return {
+      ...baseRequest,
+      isActive: data.isActive,
+    } as UpdateMCPToolRequest;
+  }
+
+  return baseRequest as CreateMCPToolRequest;
 };
 
 // MCP工具管理API
@@ -143,6 +210,7 @@ export const mcpToolsApi = {
       total_pages: number;
       data: {
         items: MCPToolResponse[];
+        stats: MCPToolStatsResponse;
       };
     }
 
@@ -151,8 +219,27 @@ export const mcpToolsApi = {
     });
 
     // 转换后端数据格式为前端格式
+    // 由于后端返回的stats字段类型与前端MCPToolStatsResponse类型不完全一致，这里需要手动转换
+    const backendStats = response.data.data.stats;
+    const transformedStats: MCPToolStatsResponse = {
+      total: backendStats.total ?? 0,
+      active: backendStats.active ?? 0,
+      inactive: backendStats.inactive ?? 0,
+      dootask_tools: backendStats.dootask_tools ?? 0,
+      external_tools: backendStats.external_tools ?? 0,
+      total_calls: backendStats.total_calls ?? 0,
+      avg_response_time: backendStats.avg_response_time ?? 0,
+    };
+
+    // 修复类型不匹配问题，确保 stats 字段包含所有前端定义的属性
     const transformedData: MCPToolListData = {
       items: response.data.data.items.map((tool: MCPToolResponse) => transformToFrontendFormat(tool)),
+      stats: {
+        ...transformedStats,
+        custom_tools: 0,
+        internal_tools: 0,
+        external_type_tools: 0,
+      },
     };
 
     return {

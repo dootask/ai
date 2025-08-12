@@ -1,11 +1,12 @@
 'use client';
 
 import {
+  DooTaskUserInfo,
+  getUserInfo,
   interceptBack,
   isMainElectron as isMainElectronTool,
   isSubElectron as isSubElectronTool,
-  getUserInfo,
-  DooTaskUserInfo,
+  setCapsuleConfig,
 } from '@dootask/tools';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { storage } from '../lib/storage';
@@ -29,6 +30,24 @@ export function DootaskProvider({ children }: { children: React.ReactNode }) {
   const [dooTaskUser, setDooTaskUser] = useState<DooTaskUserInfo | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const cleanInterceptBack = useRef<(() => void) | null>(null);
+  const [isLargeScreen, setIsLargeScreen] = useState(false)
+
+  useEffect(() => {
+    setCapsuleConfig({
+      top: isLargeScreen ? 20 : 12,
+      right: isLargeScreen ? 24 : 30
+    })
+  }, [isLargeScreen])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const resizeListener = () => {
+      setIsLargeScreen(window.innerWidth > 768)
+    }
+    resizeListener()
+    window.addEventListener("resize", resizeListener)
+    return () => window.removeEventListener("resize", resizeListener)
+  }, [])
 
   // 关闭窗口前拦截
   const beforeClose = () => {

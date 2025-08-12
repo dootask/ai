@@ -6,6 +6,8 @@ import (
 	"dootask-ai/go-service/routes/api/agents"
 	aimodels "dootask-ai/go-service/routes/api/ai-models"
 	"dootask-ai/go-service/routes/api/conversations"
+	knowledgebases "dootask-ai/go-service/routes/api/knowledge-bases"
+	mcptools "dootask-ai/go-service/routes/api/mcp-tools"
 	"dootask-ai/go-service/utils"
 	"encoding/json"
 	"errors"
@@ -234,15 +236,16 @@ func (h *Handler) Stream(c *gin.Context) {
 
 	// 创建消息处理器
 	handler := NewMessageHandler(global.DB, global.DooTaskClient.Client)
+	// 记录开始时间
+	startTime := time.Now()
 
 	// 启动协程写入AI响应到Redis
-	go handler.writeAIResponseToRedis(ctx, resp.Body, req.StreamId)
+	go handler.writeAIResponseToRedis(ctx, resp.Body, req, startTime)
 
 	// 流式消息读取，阻塞式BRPop
 	isFirstLine := true
 
-	// 记录开始时间
-	startTime := time.Now()
+	previousMessageType := ""
 
 	c.Stream(func(w io.Writer) bool {
 		for {
@@ -283,8 +286,20 @@ func (h *Handler) Stream(c *gin.Context) {
 				continue
 			}
 
-			// 设置是否为第一行，只有token类型的消息才需要判断
-			if v.Type == "token" {
+			if v.Type == "thinking" {
+				if isFirstLine {
+					v.Content = fmt.Sprintf("::: reasoning\\n%s", v.Content)
+				}
+				v.IsFirst = isFirstLine
+				isFirstLine = false
+				previousMessageType = v.Type
+			}
+
+			if v.Type == "token" || v.Type == "tool" {
+				if previousMessageType == "thinking" {
+					isFirstLine = true
+					previousMessageType = ""
+				}
 				v.IsFirst = isFirstLine
 				isFirstLine = false
 			}
@@ -329,7 +344,9 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		"proxy_url":   aiModel.ProxyURL,
 		"prompt":      agent.Prompt,
 		"spicy_level": 0,
-		"temperature": aiModel.Temperature,
+	}
+	if !aiModel.IsThinking {
+		agentConfig["temperature"] = aiModel.Temperature
 	}
 
 	threadId := fmt.Sprintf("%d_%d", req.DialogId, req.SessionId)
@@ -353,7 +370,73 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		"stream_tokens": true,
 	}
 
-	resp, err := httpClient.Stream(context.Background(), "/stream", nil, nil, http.MethodPost, data, "application/json")
+	var (
+		path      = "/stream"
+		isUseTool = false
+		isUseRag  = false
+		ragConfig = []map[string]any{}
+		mcpConfig = map[string]any{}
+	)
+
+	// 检查是否使用RAG
+	if agent.KnowledgeBases != nil {
+		var kbs []knowledgebases.KnowledgeBase
+		var kbIds []int64
+		json.Unmarshal([]byte(agent.KnowledgeBases), &kbIds)
+		global.DB.Where("id in (?) AND is_active = ?", kbIds, true).Find(&kbs)
+		if len(kbs) > 0 {
+			isUseRag = true
+			path = "/rag_agent/stream"
+			for _, kb := range kbs {
+				ragConfig = append(ragConfig, map[string]any{
+					"api_key":        kb.ApiKey,
+					"model":          kb.EmbeddingModel,
+					"provider":       kb.Provider,
+					"proxy_url":      kb.ProxyURL,
+					"knowledge_base": []string{kb.Name},
+				})
+			}
+			data["rag_config"] = ragConfig
+		}
+	}
+
+	// 检查是否使用MCP
+	if agent.Tools != nil {
+		var mcpTools []mcptools.MCPTool
+		var mcpToolIds []int64
+		json.Unmarshal([]byte(agent.Tools), &mcpToolIds)
+		global.DB.Where("id in (?) AND is_active = ?", mcpToolIds, true).Find(&mcpTools)
+		if len(mcpTools) > 0 {
+			isUseTool = true
+			path = "/mcp_agent/stream"
+			for _, mcpTool := range mcpTools {
+				var config map[string]any
+				json.Unmarshal(mcpTool.Config, &config)
+				transport := ""
+				switch mcpTool.ConfigType {
+				case 0:
+					transport = "streamable_http"
+				case 1:
+					transport = "websocket"
+				case 2:
+					transport = "sse"
+				case 3:
+					transport = "stdio"
+				default:
+					transport = "streamable_http"
+				}
+				config["transport"] = transport
+				mcpConfig[mcpTool.McpName] = config
+			}
+			data["mcp_config"] = mcpConfig
+		}
+	}
+
+	if isUseTool && isUseRag {
+		path = "/supervisor_agent/stream"
+	}
+
+	resp, err := httpClient.Stream(context.Background(), path, nil, nil, http.MethodPost, data, "application/json")
 	if err != nil {
 		return nil, errors.New("请求AI失败")
 	}

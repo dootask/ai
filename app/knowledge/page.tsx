@@ -1,9 +1,9 @@
 'use client';
 
+import { defaultPagination, Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { defaultPagination, Pagination } from '@/components/pagination';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -103,7 +103,7 @@ export default function KnowledgeBasePage() {
           if (typeof agent.knowledge_bases === 'string') {
             kbIds = JSON.parse(agent.knowledge_bases);
           } else if (Array.isArray(agent.knowledge_bases)) {
-            kbIds = agent.knowledge_bases.map(kb => (typeof kb === 'number' ? kb : parseInt(kb.toString())));
+            kbIds = agent.knowledge_bases.map((kb: unknown) => (typeof kb === 'number' ? kb : parseInt(String(kb))));
           }
           return kbIds.includes(kbId);
         } catch {

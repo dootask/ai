@@ -34,34 +34,10 @@ class Settings(BaseSettings):
 
     AUTH_SECRET: SecretStr | None = None
 
-    OPENAI_API_KEY: SecretStr | None = None
-    DEEPSEEK_API_KEY: SecretStr | None = None
-    ANTHROPIC_API_KEY: SecretStr | None = None
-    GOOGLE_API_KEY: SecretStr | None = None
-    GOOGLE_APPLICATION_CREDENTIALS: SecretStr | None = None
-    GROQ_API_KEY: SecretStr | None = None
-
-    OLLAMA_MODEL: str | None = None
-    OLLAMA_BASE_URL: str | None = None
     USE_FAKE_MODEL: bool = False
-    OPENROUTER_API_KEY: str | None = None
 
     # If DEFAULT_MODEL is None, it will be set in model_post_init
     DEFAULT_MODEL: str = "gpt-4o-mini"  # type: ignore[assignment]
-
-    # Set openai compatible api, mainly used for proof of concept
-    COMPATIBLE_MODEL: str | None = None
-    COMPATIBLE_API_KEY: SecretStr | None = None
-    COMPATIBLE_BASE_URL: str | None = None
-
-    OPENWEATHERMAP_API_KEY: SecretStr | None = None
-
-    LANGCHAIN_TRACING_V2: bool = False
-    LANGCHAIN_PROJECT: str = "default"
-    LANGCHAIN_ENDPOINT: Annotated[str, BeforeValidator(check_str_is_http)] = (
-        "https://api.smith.langchain.com"
-    )
-    LANGCHAIN_API_KEY: SecretStr | None = None
 
     LANGFUSE_TRACING: bool = False
     LANGFUSE_HOST: Annotated[str, BeforeValidator(check_str_is_http)] = (
@@ -94,14 +70,8 @@ class Settings(BaseSettings):
     MONGO_PASSWORD: SecretStr | None = None
     MONGO_AUTH_SOURCE: str | None = None
 
-    # Azure OpenAI Settings
-    AZURE_OPENAI_API_KEY: SecretStr | None = None
-    AZURE_OPENAI_ENDPOINT: str | None = None
-    AZURE_OPENAI_API_VERSION: str = "2024-02-15-preview"
-    AZURE_OPENAI_DEPLOYMENT_MAP: dict[str, str] = Field(
-        default_factory=dict, description="Map of model names to Azure deployment IDs"
-    )
     COLLECTION_NAME: str | None = "dootask_ai"
+    API_KEY: str | None = None
 
     @computed_field  # type: ignore[prop-decorator]
     @property

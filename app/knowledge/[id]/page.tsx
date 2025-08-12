@@ -16,6 +16,7 @@ import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppContext } from '@/contexts/app-context';
+import { embeddingModels } from '@/lib/ai';
 import { agentsApi } from '@/lib/api/agents';
 import { knowledgeBasesApi } from '@/lib/api/knowledge-bases';
 import { Agent, KnowledgeBase, KnowledgeBaseDocument } from '@/lib/types';
@@ -25,7 +26,6 @@ import Link from 'next/link';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { embeddingModels } from '@/lib/ai';
 
 export default function KnowledgeBaseDetailPage() {
   const params = useParams();
@@ -95,7 +95,7 @@ export default function KnowledgeBaseDetailPage() {
           if (typeof agent.knowledge_bases === 'string') {
             kbIds = JSON.parse(agent.knowledge_bases);
           } else if (Array.isArray(agent.knowledge_bases)) {
-            kbIds = agent.knowledge_bases.map(kb => (typeof kb === 'number' ? kb : parseInt(kb.toString())));
+            kbIds = agent.knowledge_bases.map((kb: unknown) => (typeof kb === 'number' ? kb : parseInt(String(kb))));
           }
           return kbIds.includes(knowledgeBase.id);
         } catch {

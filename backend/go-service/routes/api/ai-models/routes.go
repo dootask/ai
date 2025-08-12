@@ -1,12 +1,15 @@
 package aimodels
 
 import (
+	"database/sql"
 	"dootask-ai/go-service/global"
 	"dootask-ai/go-service/routes/api/agents"
 	"dootask-ai/go-service/routes/api/conversations"
 	"dootask-ai/go-service/utils"
 	"net/http"
 
+	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/duke-git/lancet/v2/cryptor"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"gorm.io/gorm"
@@ -197,7 +200,7 @@ func (h *Handler) GetAIModel(c *gin.Context) {
 	model.ConversationCount = conversationCount
 
 	// 获取关联的token使用量
-	var tokenUsage int64
+	var tokenUsage sql.NullInt64
 	if err := global.DB.Model(&conversations.Message{}).Joins(
 		"LEFT JOIN conversations ON conversations.id = messages.conversation_id",
 	).Joins(
@@ -210,7 +213,7 @@ func (h *Handler) GetAIModel(c *gin.Context) {
 		})
 		return
 	}
-	model.TokenUsage = tokenUsage
+	model.TokenUsage = tokenUsage.Int64
 
 	// 隐藏敏感信息
 	if model.ApiKey != nil && *model.ApiKey != "" {
@@ -269,19 +272,27 @@ func (h *Handler) CreateAIModel(c *gin.Context) {
 		}
 	}
 
+	// 加密api_key
+	apiKey := *req.ApiKey
+	appKey := utils.GetEnvWithDefault("API_KEY", "")
+	if appKey != "" {
+		apiKey = convertor.ToStdBase64(string(cryptor.AesGcmEncrypt([]byte(*req.ApiKey), []byte(appKey))))
+	}
+
 	// 创建模型
 	model := AIModel{
 		UserID:      int64(global.DooTaskUser.UserID),
 		Name:        req.Name,
 		Provider:    req.Provider,
 		ModelName:   req.ModelName,
-		ApiKey:      req.ApiKey,
+		ApiKey:      &apiKey,
 		BaseURL:     req.BaseURL,
 		ProxyURL:    req.ProxyURL,
 		MaxTokens:   req.MaxTokens,
 		Temperature: req.Temperature,
 		IsEnabled:   &req.IsEnabled,
 		IsDefault:   req.IsDefault,
+		IsThinking:  req.IsThinking, // 新增字段：是否为思考型模型
 	}
 
 	if err := global.DB.Create(&model).Error; err != nil {
@@ -393,7 +404,12 @@ func (h *Handler) UpdateAIModel(c *gin.Context) {
 		updates["model_name"] = *req.ModelName
 	}
 	if req.ApiKey != nil {
-		updates["api_key"] = *req.ApiKey
+		apiKey := *req.ApiKey
+		appKey := utils.GetEnvWithDefault("API_KEY", "")
+		if appKey != "" {
+			apiKey = convertor.ToStdBase64(string(cryptor.AesGcmEncrypt([]byte(*req.ApiKey), []byte(appKey))))
+		}
+		updates["api_key"] = &apiKey
 	}
 	if req.BaseURL != nil {
 		updates["base_url"] = *req.BaseURL
@@ -412,6 +428,9 @@ func (h *Handler) UpdateAIModel(c *gin.Context) {
 	}
 	if req.IsDefault != nil {
 		updates["is_default"] = *req.IsDefault
+	}
+	if req.IsThinking != nil {
+		updates["is_thinking"] = *req.IsThinking
 	}
 
 	// 执行更新

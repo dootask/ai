@@ -1,11 +1,14 @@
 package mcptools
 
 import (
+	"encoding/json"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
 	"dootask-ai/go-service/global"
+	"dootask-ai/go-service/routes/api/conversations"
 	"dootask-ai/go-service/utils"
 
 	"github.com/gin-gonic/gin"
@@ -100,10 +103,6 @@ func ListMCPTools(c *gin.Context) {
 		query = query.Where("category = ?", filters.Category)
 	}
 
-	if filters.Type != "" {
-		query = query.Where("type = ?", filters.Type)
-	}
-
 	if filters.IsActive != nil {
 		query = query.Where("is_active = ?", *filters.IsActive)
 	}
@@ -136,9 +135,48 @@ func ListMCPTools(c *gin.Context) {
 		return
 	}
 
+	// 统计工具总数
+	var totalTools int64
+	global.DB.Model(&MCPTool{}).Where("user_id = ?", global.DooTaskUser.UserID).Count(&totalTools)
+
+	// 统计启用工具总数
+	var activeTools int64
+	global.DB.Model(&MCPTool{}).Where("user_id = ? AND is_active = ?", global.DooTaskUser.UserID, true).Count(&activeTools)
+
+	// 统计对话消息中使用MCP工具的次数
+	var messages []conversations.Message
+	global.DB.Model(&conversations.Conversation{}).Joins(
+		"LEFT JOIN messages ON conversations.id = messages.conversation_id",
+	).Where("conversations.dootask_user_id = ?", strconv.Itoa(int(global.DooTaskUser.UserID))).
+		Where("messages.mcp_used IS NOT NULL").Select("messages.*").Find(&messages)
+
+	var stats MCPToolStatsResponse
+	for _, message := range messages {
+		if message.McpUsed != nil {
+			var mcpUsed []string
+			if err := json.Unmarshal(message.McpUsed, &mcpUsed); err == nil {
+				stats.TotalCalls += int64(len(mcpUsed))
+			}
+		}
+		if message.ResponseTimeMs != nil {
+			stats.AvgResponseTime += float64(*message.ResponseTimeMs)
+		}
+	}
+
+	if len(messages) > 0 {
+		stats.AvgResponseTime = stats.AvgResponseTime / float64(len(messages)) / 1000
+	}
+
 	// 构造响应数据
 	data := MCPToolListData{
 		Items: tools,
+		Stats: MCPToolStatsResponse{
+			Total:           totalTools,
+			Active:          activeTools,
+			Inactive:        totalTools - activeTools,
+			TotalCalls:      stats.TotalCalls,
+			AvgResponseTime: stats.AvgResponseTime,
+		},
 	}
 
 	// 使用统一分页响应格式
@@ -187,23 +225,45 @@ func CreateMCPTool(c *gin.Context) {
 		return
 	}
 
+	// 检查MCP工具标识是否已存在
+	if req.McpName != "" {
+		if err := global.DB.Where("user_id = ? AND mcp_name = ?", global.DooTaskUser.UserID, req.McpName).First(&existingTool).Error; err == nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{
+				"code":    "MCP_TOOL_003",
+				"message": "MCP工具标识已存在",
+				"data":    nil,
+			})
+			return
+		} else if err != gorm.ErrRecordNotFound {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    "DATABASE_001",
+				"message": "检查MCP工具标识失败",
+				"data":    nil,
+			})
+			return
+		}
+	}
+
 	// 处理JSONB字段默认值
 	if req.Config == nil {
 		req.Config = []byte("{}")
 	}
-	if req.Permissions == nil {
-		req.Permissions = []byte("[\"read\"]")
+
+	// 设置默认配置类型
+	configType := int8(ConfigTypeStreamableHTTP) // 默认为streamable_http配置
+	if req.ConfigType != nil {
+		configType = *req.ConfigType
 	}
 
 	// 创建工具
 	tool := MCPTool{
 		UserID:      int64(global.DooTaskUser.UserID),
 		Name:        req.Name,
+		McpName:     req.McpName, // 新增：MCP工具标识
 		Description: req.Description,
 		Category:    req.Category,
-		Type:        req.Type,
+		ConfigType:  configType, // 新增：配置类型
 		Config:      req.Config,
-		Permissions: req.Permissions,
 		IsActive:    true,
 	}
 
@@ -258,6 +318,25 @@ func GetMCPTool(c *gin.Context) {
 		Where("tools::jsonb ? '" + idStr + "'").
 		Count(&associatedAgents)
 
+	// 处理配置信息
+	var configInfo *ConfigInfo
+	if tool.Config != nil {
+		var configData map[string]interface{}
+		if err := json.Unmarshal(tool.Config, &configData); err == nil {
+			// 根据配置类型决定是否检查API密钥
+			hasApiKeyValue := false
+			if tool.ConfigType == ConfigTypeStreamableHTTP {
+				hasApiKeyValue = hasApiKey(configData)
+			}
+
+			configInfo = &ConfigInfo{
+				Type:       int8(tool.ConfigType),
+				HasApiKey:  hasApiKeyValue,
+				ConfigData: sanitizeConfigData(configData),
+			}
+		}
+	}
+
 	response := MCPToolResponse{
 		MCPTool:             &tool,
 		TotalCalls:          0,   // TODO: 从调用日志查询
@@ -265,9 +344,42 @@ func GetMCPTool(c *gin.Context) {
 		AverageResponseTime: 0.0, // TODO: 从调用日志计算
 		SuccessRate:         1.0, // TODO: 从调用日志计算
 		AssociatedAgents:    associatedAgents,
+		ConfigInfo:          configInfo,
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// hasApiKey 检查配置中是否有API密钥
+func hasApiKey(configData map[string]interface{}) bool {
+	// 检查常见的API密钥字段
+	keyFields := []string{"api_key", "apiKey", "key", "token", "secret"}
+	for _, field := range keyFields {
+		if value, exists := configData[field]; exists {
+			if str, ok := value.(string); ok && str != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// sanitizeConfigData 清理配置数据，移除敏感信息
+func sanitizeConfigData(configData map[string]interface{}) map[string]interface{} {
+	sanitized := make(map[string]interface{})
+
+	// 敏感字段列表
+	sensitiveFields := []string{"api_key", "apiKey", "key", "token", "secret", "password"}
+
+	for key, value := range configData {
+		isSensitive := slices.Contains(sensitiveFields, key)
+
+		if !isSensitive {
+			sanitized[key] = value
+		}
+	}
+
+	return sanitized
 }
 
 // UpdateMCPTool 更新MCP工具
@@ -343,10 +455,33 @@ func UpdateMCPTool(c *gin.Context) {
 		}
 	}
 
+	// 检查MCP工具标识是否已被其他工具使用
+	if req.McpName != nil && *req.McpName != tool.McpName {
+		var existingTool MCPTool
+		if err := global.DB.Where("user_id = ? AND mcp_name = ? AND id != ?", global.DooTaskUser.UserID, *req.McpName, id).First(&existingTool).Error; err == nil {
+			c.JSON(http.StatusUnprocessableEntity, gin.H{
+				"code":    "MCP_TOOL_003",
+				"message": "MCP工具标识已存在",
+				"data":    nil,
+			})
+			return
+		} else if err != gorm.ErrRecordNotFound {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"code":    "DATABASE_001",
+				"message": "检查MCP工具标识失败",
+				"data":    nil,
+			})
+			return
+		}
+	}
+
 	// 构建更新数据
 	updates := make(map[string]interface{})
 	if req.Name != nil {
 		updates["name"] = *req.Name
+	}
+	if req.McpName != nil {
+		updates["mcp_name"] = *req.McpName
 	}
 	if req.Description != nil {
 		updates["description"] = *req.Description
@@ -354,14 +489,11 @@ func UpdateMCPTool(c *gin.Context) {
 	if req.Category != nil {
 		updates["category"] = *req.Category
 	}
-	if req.Type != nil {
-		updates["type"] = *req.Type
+	if req.ConfigType != nil {
+		updates["config_type"] = *req.ConfigType
 	}
 	if req.Config != nil {
 		updates["config"] = req.Config
-	}
-	if req.Permissions != nil {
-		updates["permissions"] = req.Permissions
 	}
 	if req.IsActive != nil {
 		updates["is_active"] = *req.IsActive
@@ -582,9 +714,9 @@ func TestMCPTool(c *gin.Context) {
 		Message:      "工具测试成功",
 		ResponseTime: responseTime,
 		TestResult: map[string]interface{}{
-			"tool_name": tool.Name,
-			"tool_type": tool.Type,
-			"test_time": time.Now().Format("2006-01-02 15:04:05"),
+			"tool_name":     tool.Name,
+			"tool_category": tool.Category,
+			"test_time":     time.Now().Format("2006-01-02 15:04:05"),
 		},
 	}
 
@@ -603,11 +735,6 @@ func GetMCPToolStats(c *gin.Context) {
 	// 按类别统计
 	global.DB.Model(&MCPTool{}).Where("category = 'dootask'").Count(&stats.DooTaskTools)
 	global.DB.Model(&MCPTool{}).Where("category = 'external'").Count(&stats.ExternalTools)
-	global.DB.Model(&MCPTool{}).Where("category = 'custom'").Count(&stats.CustomTools)
-
-	// 按类型统计
-	global.DB.Model(&MCPTool{}).Where("type = 'internal'").Count(&stats.InternalTools)
-	global.DB.Model(&MCPTool{}).Where("type = 'external'").Count(&stats.ExternalTypeTools)
 
 	// TODO: 从调用日志表统计使用数据
 	stats.TotalCalls = 0

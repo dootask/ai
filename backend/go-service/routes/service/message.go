@@ -97,7 +97,14 @@ func (h *MessageHandler) handleMessageMessage(v StreamLineData, req WebhookReque
 	// 处理可能包含HTML的内容
 	processedContent := h.processHTMLContent(StreamMessageData.Content)
 
-	h.createMessage(req, processedContent, startTime, status, StreamMessageData.UsageMetadata.InputTokens, StreamMessageData.UsageMetadata.OutputTokens)
+	h.createMessage(CreateMessage{
+		Req:          req,
+		Content:      processedContent,
+		StartTime:    startTime,
+		Status:       status,
+		InputTokens:  StreamMessageData.UsageMetadata.InputTokens,
+		OutputTokens: StreamMessageData.UsageMetadata.OutputTokens,
+	})
 	h.sendDooTaskMessage(req, processedContent)
 }
 
@@ -133,17 +140,26 @@ func (h *MessageHandler) parseErrorContent(content string) (*StreamErrorData, er
 // handleErrorMessage 处理error类型消息
 func (h *MessageHandler) handleErrorMessage(v StreamLineData, req WebhookRequest, w io.Writer, status int) {
 	if content, ok := v.Content.(string); ok {
+		processedErrorMsg := ""
 		StreamErrorData, err := h.parseErrorContent(content)
 		if err != nil {
+			processedErrorMsg = err.Error()
 			logError("错误消息解析失败", err, "type:", v.Type)
-			return
+		} else {
+			processedErrorMsg = h.processHTMLContent(StreamErrorData.Error.Message)
 		}
 
 		// 处理可能包含HTML的错误消息
-		processedErrorMsg := h.processHTMLContent(StreamErrorData.Error.Message)
 
 		h.sendSSEResponse(w, req, "done", processedErrorMsg)
-		h.createMessage(req, processedErrorMsg, time.Now(), status, 0, 0)
+		h.createMessage(CreateMessage{
+			Req:          req,
+			Content:      processedErrorMsg,
+			StartTime:    time.Now(),
+			Status:       status,
+			InputTokens:  0,
+			OutputTokens: 0,
+		})
 		h.sendDooTaskMessage(req, processedErrorMsg)
 	} else {
 		logError("Error消息内容类型错误", nil, "type:", v.Type, "content:", fmt.Sprintf("%v", v.Content))
@@ -158,7 +174,7 @@ func (h *MessageHandler) handleDone(req WebhookRequest, w io.Writer) {
 // handleMessage 根据消息类型分发处理
 func (h *MessageHandler) handleMessage(v StreamLineData, req WebhookRequest, w io.Writer, startTime time.Time, status int) {
 	switch v.Type {
-	case "token":
+	case "token", "thinking", "tool":
 		h.handleTokenMessage(v, req, w)
 	case "message":
 		h.handleMessageMessage(v, req, startTime, status)
@@ -170,16 +186,16 @@ func (h *MessageHandler) handleMessage(v StreamLineData, req WebhookRequest, w i
 }
 
 // createMessage 创建消息
-func (h *MessageHandler) createMessage(req WebhookRequest, content string, startTime time.Time, status int, inputTokens int, outputTokens int) {
+func (h *MessageHandler) createMessage(createMessage CreateMessage) {
 	// 获取对话
 	var agent agents.Agent
-	if err := global.DB.Where("bot_id = ?", req.BotUid).First(&agent).Error; err != nil {
-		logError("查询智能体失败", err, "bot_id:", fmt.Sprintf("%d", req.BotUid))
+	if err := global.DB.Where("bot_id = ?", createMessage.Req.BotUid).First(&agent).Error; err != nil {
+		logError("查询智能体失败", err, "bot_id:", fmt.Sprintf("%d", createMessage.Req.BotUid))
 		return
 	}
 
 	var conversation conversations.Conversation
-	dialogId := strconv.Itoa(int(req.DialogId))
+	dialogId := strconv.Itoa(int(createMessage.Req.DialogId))
 	userID := strconv.Itoa(int(global.DooTaskUser.UserID))
 	if err := h.db.Where("agent_id = ? AND dootask_user_id = ? AND dootask_chat_id = ?", agent.ID, userID, dialogId).First(&conversation).Error; err != nil {
 		logError("查询对话失败", err, "dialog_id:", dialogId, "user_id:", userID)
@@ -187,30 +203,33 @@ func (h *MessageHandler) createMessage(req WebhookRequest, content string, start
 	}
 
 	// 计算响应时间
-	responseTimeMs := int(time.Since(startTime).Milliseconds())
+	responseTimeMs := int(time.Since(createMessage.StartTime).Milliseconds())
 
 	// 使用rune处理Unicode字符，确保正确截取多字节字符
-	runes := []rune(content)
+	runes := []rune(createMessage.Content)
 	if len(runes) > 200 {
-		content = string(runes[:200]) + "..."
+		createMessage.Content = string(runes[:200]) + "..."
 	}
 
 	// 创建AI回复消息
 	message := conversations.Message{
 		ConversationID: conversation.ID,
-		SendID:         req.SendId,
+		SendID:         createMessage.Req.SendId,
 		Role:           "assistant",
-		Content:        content,
+		Content:        createMessage.Content,
 		ResponseTimeMs: &responseTimeMs,
-		Status:         status,
-		TokensUsed:     outputTokens,
+		Status:         createMessage.Status,
+		TokensUsed:     createMessage.OutputTokens,
+	}
+	if createMessage.McpUsed != nil {
+		message.McpUsed = *createMessage.McpUsed
 	}
 	h.db.Create(&message)
 	// 更新用户提问消息的token使用量
 	h.db.Model(&conversations.Message{}).
-		Where("conversation_id = ? AND role = ? AND send_id = ?", conversation.ID, "user", req.SendId).
+		Where("conversation_id = ? AND role = ? AND send_id = ?", conversation.ID, "user", createMessage.Req.SendId).
 		Updates(map[string]interface{}{
-			"tokens_used": inputTokens,
+			"tokens_used": createMessage.InputTokens,
 		})
 }
 
@@ -224,30 +243,31 @@ func logError(message string, err error, fields ...string) {
 }
 
 // writeAIResponseToRedis 写入AI响应到Redis
-func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.ReadCloser, streamId string) {
+func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.ReadCloser, req WebhookRequest, startTime time.Time) {
 	defer func() {
 		// 确保写入协程结束时发送结束信号
-		global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", streamId), "[DONE]")
+		global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", req.StreamId), "[DONE]")
 	}()
 
 	reader := bufio.NewReader(body)
 
 	var tokenBuffer []string
+	var currentMessageType string = "token" // 默认消息类型
 	lastCompressTime := time.Now()
 	// 获取流间隔时间
 	streamInterval, _ := strconv.Atoi(utils.GetEnvWithDefault("AI_STREAM_INTERVAL", "100"))
 	compressInterval := time.Duration(streamInterval) * time.Millisecond
 
 	// 压缩并写入Redis的函数
-	compressAndWrite := func() {
+	compressAndWrite := func(messageType string) {
 		if len(tokenBuffer) > 0 {
 			combinedContent := strings.Join(tokenBuffer, "")
 			compressedMessage := StreamLineData{
-				Type:    "token",
+				Type:    messageType,
 				Content: combinedContent,
 			}
 			if jsonData, err := json.Marshal(compressedMessage); err == nil {
-				global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", streamId), string(jsonData))
+				global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", req.StreamId), string(jsonData))
 			}
 			tokenBuffer = tokenBuffer[:0]
 		}
@@ -256,8 +276,8 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 	for {
 		select {
 		case <-ctx.Done():
-			compressAndWrite()
-			logError("AI响应读取超时", nil, "stream_id:", streamId)
+			compressAndWrite(currentMessageType)
+			logError("AI响应读取超时", nil, "stream_id:", req.StreamId)
 			return
 		default:
 		}
@@ -265,7 +285,7 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err.Error() == "EOF" {
-				compressAndWrite()
+				compressAndWrite(currentMessageType)
 				break
 			}
 			logError("读取数据失败", err)
@@ -277,7 +297,7 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 		}
 
 		if line == "[DONE]" {
-			compressAndWrite()
+			compressAndWrite(currentMessageType)
 			break
 		}
 
@@ -286,16 +306,58 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 			continue
 		}
 
-		if v.Type == "token" {
+		if v.Content == nil || v.Content == "" {
+			continue
+		}
+
+		if v.Type == "token" || v.Type == "thinking" {
 			if content, ok := v.Content.(string); ok {
+				currentMessageType = v.Type // 更新当前消息类型
 				tokenBuffer = append(tokenBuffer, content)
 				if time.Since(lastCompressTime) >= compressInterval {
-					compressAndWrite()
+					compressAndWrite(v.Type)
 					lastCompressTime = time.Now()
 				}
 			}
 		} else {
-			global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", streamId), line)
+			if v.Type == "message" {
+				contentJson, _ := json.Marshal(v.Content)
+				var toolData StreamToolData
+				if err := json.Unmarshal(contentJson, &toolData); err == nil {
+					if toolData.Type == "tool" {
+						continue
+					}
+					if toolData.Type == "ai" {
+						if len(toolData.ToolCalls) > 0 {
+							currentMessageType = "tool"
+							mcpUsed := []string{}
+							for _, toolCall := range toolData.ToolCalls {
+								content := fmt.Sprintf("#### MCP工具调用: %s\n", toolCall.Name)
+								tokenBuffer = append(tokenBuffer, content)
+								if time.Since(lastCompressTime) >= compressInterval {
+									v.Type = "tool"
+									v.Content = content
+									compressAndWrite(v.Type)
+									lastCompressTime = time.Now()
+								}
+								mcpUsed = append(mcpUsed, toolCall.Name)
+							}
+							mcpUsedJson, _ := json.Marshal(mcpUsed)
+							h.createMessage(CreateMessage{
+								Req:          req,
+								Content:      "MCP工具调用",
+								StartTime:    startTime,
+								Status:       1,
+								InputTokens:  toolData.UsageMetadata.InputTokens,
+								OutputTokens: toolData.UsageMetadata.OutputTokens,
+								McpUsed:      (*json.RawMessage)(&mcpUsedJson),
+							})
+							continue
+						}
+					}
+				}
+			}
+			global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", req.StreamId), line)
 		}
 	}
 }

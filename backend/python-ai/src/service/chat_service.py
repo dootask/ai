@@ -24,7 +24,7 @@ class ChatService:
     """聊天服务类，处理与代理的交互逻辑"""
 
     async def _handle_input(
-        self, user_input: UserInput, agent: AgentGraph, agent_id: str
+        self, user_input: UserInput, agent: AgentGraph, agent_id: str, langfuse_handler: CallbackHandler | None
     ) -> tuple[dict[str, Any], UUID]:
         """
         Parse user input and handle any required interrupt resumption.
@@ -42,11 +42,17 @@ class ChatService:
         }
 
         callbacks = []
-        if settings.LANGFUSE_TRACING:
+        metadata = {}
+        if settings.LANGFUSE_TRACING and langfuse_handler:
             # Initialize Langfuse CallbackHandler for Langchain (tracing)
-            langfuse_handler = CallbackHandler()
+            # langfuse_handler = CallbackHandler()
             # print(f"Using Langfuse for tracing with run_id: {run_id}")
             callbacks.append(langfuse_handler)
+            metadata = {
+                "langfuse_user_id": user_id,
+                "langfuse_session_id": thread_id,
+                "langfuse_tags": [agent_id]
+            }
 
         if user_input.agent_config:
             if overlap := configurable.keys() & user_input.agent_config.keys():
@@ -55,22 +61,23 @@ class ChatService:
                     detail=f"agent_config contains reserved keys: {overlap}",
                 )
             configurable.update(user_input.agent_config)
-            configurable["agent_config"] = tuple(sorted(user_input.agent_config.items()))
+            configurable["agent_config"] = json.dumps(user_input.agent_config)
 
         if user_input.mcp_config:
-            configurable["mcp_config"] = tuple(sorted(user_input.mcp_config.items()))
+            configurable["mcp_config"] = json.dumps(user_input.mcp_config)
         if user_input.rag_config:
-            if not user_input.rag_config.get("knowledge_base") or len(user_input.rag_config.get("knowledge_base")) > 3:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"knowledge_base only supports 3 at most",
-                )
-            configurable["rag_config"] = tuple(sorted(user_input.rag_config.items()))
+            # if not user_input.rag_config.get("knowledge_base") or len(user_input.rag_config.get("knowledge_base") or []) > 3:
+            #     raise HTTPException(
+            #         status_code=422,
+            #         detail=f"knowledge_base only supports 3 at most",
+            #     )
+            configurable["rag_config"] = json.dumps(user_input.rag_config)
 
         config = RunnableConfig(
             configurable=configurable,
             run_id=run_id,
             callbacks=callbacks,
+            metadata=metadata
         )
 
         # Check for interrupts that need to be resumed
@@ -93,7 +100,7 @@ class ChatService:
 
         return kwargs, run_id
 
-    async def invoke_agent(self, user_input: UserInput, agent_id: str = DEFAULT_AGENT) -> ChatMessage:
+    async def invoke_agent(self, callback: CallbackHandler | None, user_input: UserInput, agent_id: str = DEFAULT_AGENT) -> ChatMessage:
         """
         Invoke an agent with user input to retrieve a final response.
 
@@ -108,7 +115,7 @@ class ChatService:
         # you'd want to include it. You could update the API to return a list of ChatMessages
         # in that case.
         agent: AgentGraph = get_agent(agent_id)
-        kwargs, run_id = await self._handle_input(user_input, agent, agent_id)
+        kwargs, run_id = await self._handle_input(user_input, agent, agent_id, callback)
 
         response_events: list[tuple[str, Any]] = await agent.ainvoke(**kwargs, stream_mode=["updates", "values"])  # type: ignore # fmt: skip
         response_type, response = response_events[-1]
@@ -128,7 +135,7 @@ class ChatService:
         return output
 
     async def message_generator(
-        self, user_input: StreamInput, agent_id: str = DEFAULT_AGENT
+        self, callback: CallbackHandler | None, user_input: StreamInput, agent_id: str = DEFAULT_AGENT
     ) -> AsyncGenerator[str, None]:
         """
         Generate a stream of messages from the agent.
@@ -136,7 +143,7 @@ class ChatService:
         This is the workhorse method for the /stream endpoint.
         """
         agent: AgentGraph = get_agent(agent_id)
-        kwargs, run_id = await self._handle_input(user_input, agent, agent_id)
+        kwargs, run_id = await self._handle_input(user_input, agent, agent_id, callback)
 
         try:
             # Process streamed events from the graph and yield messages over the SSE stream.
@@ -175,8 +182,8 @@ class ChatService:
                                 update_messages = [update_messages[-1]]
                             else:
                                 update_messages = []
-
-                        if node in ("research_expert", "math_expert"):
+                        # print("0-------->",node)
+                        if node in ("research_expert", "math_expert", "mcp_agent"):
                             update_messages = []
                         new_messages.extend(update_messages)
 
@@ -231,6 +238,11 @@ class ChatService:
                     # Drop them.
                     if not isinstance(msg, AIMessageChunk):
                         continue
+
+                    reasoning_content = msg.additional_kwargs.get("reasoning_content")
+                    if reasoning_content:
+                        yield f"data: {json.dumps({'type': 'thinking', 'content': convert_message_content_to_string(reasoning_content)})}\n\n"
+                        
                     content = remove_tool_calls(msg.content)
                     if content:
                         # Empty content in the context of OpenAI usually means

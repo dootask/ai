@@ -1,0 +1,12 @@
+name: 
+  en: AI Agent
+  zh: AI 智能体
+description:
+  en: AI Agent is a AI assistant that allows you to provide a enterprise-level AI assistant service.
+  zh: AI 智能体，允许您为团队提供智能化的企业级 AI 助手服务。
+tags:
+  - AI 智能体
+  - AI Agent
+author: DooTask
+website: https://www.dootask.com
+github: https://github.com/dootask/ai

@@ -62,10 +62,8 @@ popd > /dev/null
 # 准备Python AI服务
 echo "🤖 准备Python AI服务..."
 pushd backend/python-ai > /dev/null
-if [ ! -d ".venv" ]; then
-    echo "📦 创建Python虚拟环境..."
-    uv sync
-fi
+echo "📦 创建Python虚拟环境..."
+uv sync
 popd > /dev/null
 
 echo ""

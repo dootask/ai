@@ -1,18 +1,21 @@
+import json
 import math
 import re
 import time
+
 st= time.time()
+import asyncio
+
 import numexpr
 from core import settings
 # from langchain_openai import OpenAIEmbeddings
 from core.embeddings import get_embeddings_by_provider
+from langchain.retrievers import MergerRetriever
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import BaseTool, tool
 from langchain_postgres import PGVector
-from langchain_core.runnables import RunnableConfig
-import asyncio
-from langchain.retrievers import (
-    MergerRetriever,
-)
+
+
 def calculator_func(expression: str) -> str:
     """Calculates a math expression using numexpr.
 
@@ -77,7 +80,7 @@ def load_postgres_vectorstore(knowledge_base: list[str] = ["default_knowledge_ba
                 "proxy_url": embeddings_config.get("proxy_url"),
                 "dimensions": embeddings_config.get("dimensions", None)
             }
-        embeddings = get_embeddings_by_provider(provider, model, tuple(sorted(config.items())))
+        embeddings = get_embeddings_by_provider(provider, model, json.dumps(config))
     except Exception as e:
         raise RuntimeError( "初始化Embeddings失败。请确保已设置相应的API密钥。" ) from e
 
@@ -96,32 +99,6 @@ def load_postgres_vectorstore(knowledge_base: list[str] = ["default_knowledge_ba
         retrievers.append(retriever)
     lotr = MergerRetriever(retrievers=retrievers)
     return lotr
-    # async def _run():
-    #     async def search_one(collection: str):
-    #         vs = PGVector(
-    #             collection_name=collection,
-    #             connection=connection_string,
-    #             embeddings=embeddings,
-    #             async_mode=True
-    #         )
-    #         docs = await vs.as_retriever(search_kwargs={"k": 3}).ainvoke(query)
-    #         return [doc.page_content for doc in docs]
-
-    #     results = await asyncio.gather(*[search_one(c) for c in knowledge_base])
-    #     merged = "\n\n".join([f"source: <<{c}>>\n" + "\n".join(r) for c, r in zip(knowledge_base, results)])
-    #     # print(merged)
-    #     return merged
-
-    # # 在同步函数里跑协程
-    # try:
-    #     loop = asyncio.get_running_loop()
-    # except RuntimeError:
-    #     loop = None
-    # if loop and loop.is_running():
-    #     return loop.create_task(_run())
-    # else:
-    #     return asyncio.run(_run())    
-
 
 
 def database_search_func(query: str, config: RunnableConfig ) -> str:
@@ -139,7 +116,7 @@ def database_search_func(query: str, config: RunnableConfig ) -> str:
         raise ValueError("config not found")
     
     configurable = config.get("configurable").get("rag_config")
-    configurable = dict(configurable) if configurable else {}
+    configurable = json.loads(configurable) if configurable else {}
     # 获取PostgreSQL检索器
     retriever = load_postgres_vectorstore(knowledge_base=configurable.get("knowledge_base"), embeddings_config=configurable)
     # # 在数据库中搜索相关文档

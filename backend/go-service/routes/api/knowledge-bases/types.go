@@ -14,13 +14,16 @@ type KnowledgeBase struct {
 	EmbeddingModel string          `gorm:"type:varchar(100);default:'text-embedding-ada-002'" json:"embedding_model" validate:"required"`
 	ChunkSize      int             `gorm:"default:1000" json:"chunk_size" validate:"min=100,max=4000"`
 	ChunkOverlap   int             `gorm:"default:200" json:"chunk_overlap" validate:"min=0,max=1000"`
+	ApiKey         string          `gorm:"type:text" json:"api_key"` // 不返回给前端
+	Provider       string          `gorm:"type:varchar(100);default:''" json:"provider"`
+	ProxyURL       string          `gorm:"type:varchar(500);default:''" json:"proxy_url"`
 	Metadata       json.RawMessage `gorm:"type:jsonb;default:'{}'" json:"metadata"`
 	IsActive       bool            `gorm:"default:true" json:"is_active"`
 	CreatedAt      time.Time       `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt      time.Time       `gorm:"autoUpdateTime" json:"updated_at"`
 
 	// 关联查询字段
-	DocumentsCount int `gorm:"-" json:"documents_count"`
+	DocumentsCount int `gorm:"->:migration" json:"documents_count"`
 }
 
 // KBDocument 知识库文档模型
@@ -35,7 +38,7 @@ type KBDocument struct {
 	Metadata        json.RawMessage `gorm:"type:jsonb;default:'{}'" json:"metadata"`
 	ChunkIndex      int             `gorm:"default:0" json:"chunk_index"`
 	ParentDocID     *int64          `gorm:"column:parent_doc_id" json:"parent_doc_id"`
-	ProcessStatus   string          `gorm:"-" json:"status"` // 处理状态：processed, processing, failed
+	Status          string          `gorm:"type:varchar(20);default:'processing'" json:"status"`
 	IsActive        bool            `gorm:"default:true" json:"is_active"`
 	CreatedAt       time.Time       `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt       time.Time       `gorm:"autoUpdateTime" json:"updated_at"`
@@ -53,6 +56,9 @@ type CreateKnowledgeBaseRequest struct {
 	EmbeddingModel string          `json:"embedding_model" validate:"required"`
 	ChunkSize      int             `json:"chunk_size" validate:"min=100,max=4000"`
 	ChunkOverlap   int             `json:"chunk_overlap" validate:"min=0,max=1000"`
+	ApiKey         *string         `json:"api_key"`
+	Provider       string          `json:"provider" validate:"required"` // 新增
+	ProxyURL       *string         `json:"proxy_url"`                    // 新增
 	Metadata       json.RawMessage `json:"metadata"`
 }
 
@@ -63,6 +69,9 @@ type UpdateKnowledgeBaseRequest struct {
 	EmbeddingModel *string         `json:"embedding_model"`
 	ChunkSize      *int            `json:"chunk_size" validate:"omitempty,min=100,max=4000"`
 	ChunkOverlap   *int            `json:"chunk_overlap" validate:"omitempty,min=0,max=1000"`
+	ApiKey         *string         `json:"api_key"`
+	Provider       *string         `json:"provider"`  // 新增
+	ProxyURL       *string         `json:"proxy_url"` // 新增
 	Metadata       json.RawMessage `json:"metadata"`
 	IsActive       *bool           `json:"is_active"`
 }
@@ -110,6 +119,21 @@ type KnowledgeBaseResponse struct {
 	TotalChunks        int        `json:"total_chunks"`
 	ProcessedChunks    int        `json:"processed_chunks"`
 	LastDocumentUpload *time.Time `json:"last_document_upload,omitempty"`
+}
+
+// UploadDocumentResponse 上传文档响应
+type UploadDocumentResponse struct {
+	KnowledgeBase  string          `json:"knowledge_base"`
+	TotalFiles     int             `json:"total_files"`
+	TotalChunks    int             `json:"total_chunks"`
+	ProcessedFiles []ProcessedFile `json:"processed_files"`
+}
+
+// ProcessedFile 处理文件
+type ProcessedFile struct {
+	Filename string `json:"filename"`
+	Chunks   int    `json:"chunks"`
+	Status   string `json:"status"`
 }
 
 // 辅助方法

@@ -1,11 +1,9 @@
+import json
 import os
 import tempfile
 from uuid import uuid4
 
-from psycopg_pool import AsyncConnectionPool
-
-from core import settings
-from core.embeddings import get_embeddings_by_provider
+from core import get_embeddings_by_provider, settings
 from fastapi import HTTPException, UploadFile
 from langchain_community.document_loaders import (
     PyPDFLoader, TextLoader, UnstructuredWordDocumentLoader)
@@ -13,6 +11,8 @@ from langchain_core.documents import Document
 from langchain_postgres import PGVector
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from psycopg.rows import dict_row
+from psycopg_pool import AsyncConnectionPool
+
 
 class DocumentService:
     """文档处理服务"""
@@ -46,7 +46,8 @@ class DocumentService:
     def get_vectorstore(self, provider="openai", model="text-embedding-3-small", config=None, collection_name: str = "default_knowledge_base") -> PGVector:
         """获取向量存储实例"""
         connection_string = self.get_postgres_connection_string()
-        embeddings = get_embeddings_by_provider(provider, model, tuple(sorted(config.items())))
+
+        embeddings = get_embeddings_by_provider(provider, model, json.dumps(config))
         
         return PGVector(
             embeddings=embeddings,

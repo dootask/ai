@@ -1,6 +1,6 @@
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.messages import ChatMessage as LangchainChatMessage
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from schema import ChatMessage
 
 
@@ -55,6 +55,12 @@ def langchain_to_chat_message(message: BaseMessage) -> ChatMessage:
                 return custom_message
             else:
                 raise ValueError(f"Unsupported chat message role: {message.role}")
+        case SystemMessage():
+            system_message = ChatMessage(
+                type="custom",
+                content=convert_message_content_to_string(message.content),
+            )
+            return system_message
         case _:
             raise ValueError(f"Unsupported message type: {message.__class__.__name__}")
 
@@ -69,3 +75,5 @@ def remove_tool_calls(content: str | list[str | dict]) -> str | list[str | dict]
         for content_item in content
         if isinstance(content_item, str) or content_item["type"] != "tool_use"
     ]
+
+

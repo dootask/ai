@@ -18,6 +18,7 @@ type AIModel struct {
 	Temperature float32   `json:"temperature" gorm:"type:decimal(3,2);default:0.7" validate:"min=0,max=2"`
 	IsEnabled   *bool     `json:"is_enabled" gorm:"default:true"`
 	IsDefault   bool      `json:"is_default" gorm:"default:false"`
+	IsThinking  bool      `json:"is_thinking" gorm:"default:false"`
 	CreatedAt   time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt   time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 
@@ -43,6 +44,7 @@ type CreateAIModelRequest struct {
 	Temperature float32 `json:"temperature" validate:"min=0,max=2"`
 	IsEnabled   bool    `json:"is_enabled"`
 	IsDefault   bool    `json:"is_default"`
+	IsThinking  bool    `json:"is_thinking"` // 新增字段：是否为思考型模型
 }
 
 // UpdateAIModelRequest 更新AI模型请求
@@ -57,6 +59,7 @@ type UpdateAIModelRequest struct {
 	Temperature *float32 `json:"temperature,omitempty" validate:"omitempty,min=0,max=2"`
 	IsEnabled   *bool    `json:"is_enabled,omitempty"`
 	IsDefault   *bool    `json:"is_default,omitempty"`
+	IsThinking  *bool    `json:"is_thinking,omitempty"` // 新增字段：是否为思考型模型
 }
 
 // AIModelFilters AI模型筛选条件

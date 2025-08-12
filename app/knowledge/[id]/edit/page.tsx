@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { embeddingModels } from '@/lib/ai';
 import { knowledgeBasesApi } from '@/lib/api/knowledge-bases';
+import { KnowledgeBase } from '@/lib/types';
 import { Database, Save, Settings } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -29,6 +30,8 @@ interface KnowledgeBaseFormData {
   embeddingModel: string;
   chunkSize?: number;
   chunkOverlap?: number;
+  apiKey?: string;
+  proxyUrl?: string; // 保留：非必填
   metadata?: Record<string, unknown>;
   isActive?: boolean;
 }
@@ -38,12 +41,15 @@ export default function EditKnowledgeBasePage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [model, setModel] = useState<KnowledgeBase | null>(null);
   const [formData, setFormData] = useState<KnowledgeBaseFormData>({
     name: '',
     description: '',
     embeddingModel: '',
     chunkSize: 1000,
     chunkOverlap: 200,
+    apiKey: '',
+    proxyUrl: '', // 新增：非必填
   });
 
   // 转换为CommandSelect选项
@@ -60,12 +66,15 @@ export default function EditKnowledgeBasePage() {
       const kb = await knowledgeBasesApi.get(kbId);
       const formattedKB = kb;
 
+      setModel(formattedKB);
+
       setFormData({
         name: formattedKB.name || '',
         description: formattedKB.description || '',
         embeddingModel: formattedKB.embedding_model,
         chunkSize: formattedKB.chunk_size || 1000,
         chunkOverlap: formattedKB.chunk_overlap || 200,
+        proxyUrl: formattedKB.proxy_url || '', // 新增
         isActive: formattedKB.is_active,
       });
     } catch (error) {
@@ -93,7 +102,28 @@ export default function EditKnowledgeBasePage() {
 
     try {
       const kbId = parseInt(params.id as string);
-      const updatedKB = await knowledgeBasesApi.update(kbId, formData);
+      
+      // 从选中的embedding模型中提取provider
+      const selectedModel = embeddingModels.find(model => model.value === formData.embeddingModel);
+      if (!selectedModel) {
+        toast.error('请选择有效的Embedding模型');
+        return;
+      }
+
+      // 构建更新数据，包含从embedding模型中提取的provider
+      const updateData = {
+        name: formData.name,
+        description: formData.description,
+        embedding_model: formData.embeddingModel,
+        chunk_size: formData.chunkSize,
+        chunk_overlap: formData.chunkOverlap,
+        api_key: formData.apiKey || undefined,
+        provider: selectedModel.provider, // 从选中的模型中提取
+        proxy_url: formData.proxyUrl || undefined,
+        is_active: formData.isActive,
+      };
+
+      const updatedKB = await knowledgeBasesApi.update(kbId, updateData);
       toast.success(`知识库 "${updatedKB.name}" 更新成功！`);
       router.push(`/knowledge/${params.id}`);
     } catch (error) {
@@ -232,6 +262,30 @@ export default function EditKnowledgeBasePage() {
                       <p>模型：{selectedModel.label}</p>
                     </div>
                   )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="proxyUrl">代理 URL</Label>
+                  <Input
+                    id="proxyUrl"
+                    type="url"
+                    placeholder="https://your-proxy-server.com"
+                    value={formData.proxyUrl || ''}
+                    onChange={e => setFormData(prev => ({ ...prev, proxyUrl: e.target.value }))}
+                  />
+                  <p className="text-muted-foreground text-xs">可选的代理服务器地址，用于访问 AI 服务</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="apiKey">API 密钥</Label>
+                  <Input
+                    id="apiKey"
+                    type="password"
+                    placeholder={model?.api_key ? '***已配置***' : 'sk-... 或其他API密钥'}
+                    value={formData?.apiKey || ''}
+                    onChange={e => setFormData(prev => ({ ...prev, apiKey: e.target.value }))}
+                  />
+                  <p className="text-muted-foreground text-xs">用于访问特定 Embedding 模型的 API 密钥，如果模型需要的话</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

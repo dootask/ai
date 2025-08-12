@@ -1,5 +1,7 @@
 'use client';
 
+import { FloatingLoading } from '@/components/loading';
+import { defaultPagination, Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,9 +15,10 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppContext } from '@/contexts/app-context';
-import { toolCategories, toolPermissions, toolTypes } from '@/lib/ai';
+import { useDebounceCallback } from '@/hooks/use-debounce';
+import { toolCategories } from '@/lib/ai';
 import { mcpToolsApi } from '@/lib/api/mcp-tools';
-import { MCPTool, PaginationBase } from '@/lib/types';
+import { MCPTool, MCPToolListData, MCPToolStatsResponse, PaginationBase, PaginationResponse } from '@/lib/types';
 import { getAllAgents } from '@/lib/utils';
 import {
   Activity,
@@ -32,23 +35,41 @@ import {
   Wrench,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useDebounceCallback } from '@/hooks/use-debounce';
-import { defaultPagination, Pagination } from '@/components/pagination';
 
 export default function ToolsPage() {
   const [tools, setTools] = useState<MCPTool[]>([]);
   const [pagination, setPagination] = useState<PaginationBase>(defaultPagination);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isFilterLoading, setIsFilterLoading] = useState(false);
+  const [toolStats, setToolStats] = useState<MCPToolStatsResponse | null>(null);
+  const [loadingTimeout, setLoadingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const isInitialMount = useRef(true);
 
   const { Confirm } = useAppContext();
 
   // 加载MCP工具列表
-  const loadTools = useDebounceCallback(async () => {
-    setIsLoading(true);
+  const loadTools = useDebounceCallback(async (isFilter = false) => {
+    // 清除之前的timeout
+    if (loadingTimeout) {
+      clearTimeout(loadingTimeout);
+      setLoadingTimeout(null);
+    }
+
+    // 如果是筛选操作且不是首次加载，设置200ms延迟显示loading
+    let currentTimeout: NodeJS.Timeout | null = null;
+    if (isFilter && !isInitialMount.current) {
+      currentTimeout = setTimeout(() => {
+        setIsFilterLoading(true);
+      }, 200);
+      setLoadingTimeout(currentTimeout);
+    } else if (isInitialMount.current) {
+      setIsInitialLoading(true);
+    }
+
     try {
       // 构建查询参数
       const filters: Record<string, unknown> = {};
@@ -62,7 +83,7 @@ export default function ToolsPage() {
       }
 
       // 获取工具列表
-      const response = await mcpToolsApi.list({
+      const response: PaginationResponse<MCPToolListData> = await mcpToolsApi.list({
         page: pagination.current_page,
         page_size: pagination.page_size,
         filters,
@@ -70,26 +91,66 @@ export default function ToolsPage() {
 
       setTools(response.data.items);
       setPagination(response);
+      
+      // 设置统计信息
+      if (response.data.stats) {
+        setToolStats(response.data.stats);
+      }
     } catch (error) {
       console.error('Failed to load tools:', error);
       toast.error('加载工具列表失败');
     } finally {
-      setIsLoading(false);
+      // 清除loading timeout
+      if (currentTimeout) {
+        clearTimeout(currentTimeout);
+        setLoadingTimeout(null);
+      }
+      
+      if (isFilter && !isInitialMount.current) {
+        setIsFilterLoading(false);
+      } else if (isInitialMount.current) {
+        setIsInitialLoading(false);
+        isInitialMount.current = false;
+      }
     }
   }, [selectedCategory, searchQuery, pagination.current_page, pagination.page_size]);
+
+  // 筛选加载处理
+  const handleFilterChange = async (newCategory: string) => {
+    setSelectedCategory(newCategory);
+    setPagination(prev => ({ ...prev, current_page: 1 })); // 重置到第一页
+  };
+
+  // 搜索处理
+  const handleSearchChange = (query: string) => {
+    setSearchQuery(query);
+    setPagination(prev => ({ ...prev, current_page: 1 })); // 重置到第一页
+  };
 
   // 分页切换
   const handlePageChange = (page: number) => {
     setPagination(prev => ({ ...prev, current_page: page }));
   };
+  
   // 每页数量切换
   const handlePageSizeChange = (size: number) => {
     setPagination(prev => ({ ...prev, page_size: size, current_page: 1 }));
   };
 
   useEffect(() => {
-    loadTools();
+    // 判断是否为筛选操作
+    const isFilter = !isInitialMount.current;
+    loadTools(isFilter);
   }, [loadTools]);
+
+  // 清理timeout
+  useEffect(() => {
+    return () => {
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+      }
+    };
+  }, [loadingTimeout]);
 
   const handleToggleActive = async (toolId: string, isActive: boolean) => {
     try {
@@ -184,21 +245,7 @@ export default function ToolsPage() {
     );
   };
 
-  const getTypeBadge = (type: string) => {
-    const typeOption = toolTypes.find(item => item.value === type);
-    if (typeOption) {
-      return (
-        <Badge variant={typeOption.variant} className="text-xs">
-          {typeOption.shortLabel}
-        </Badge>
-      );
-    }
-    return (
-      <Badge variant="outline" className="text-xs">
-        {type}
-      </Badge>
-    );
-  };
+
 
   const getSuccessRateBadge = (successRate: number) => {
     if (successRate >= 0.95) {
@@ -222,18 +269,7 @@ export default function ToolsPage() {
     }
   };
 
-  // 统计数据
-  const stats = {
-    total: tools.length,
-    active: tools.filter(tool => tool.isActive).length,
-    totalCalls: tools.reduce((sum, tool) => sum + (tool.statistics?.totalCalls || 0), 0),
-    avgResponseTime:
-      tools.length > 0
-        ? tools.reduce((sum, tool) => sum + (tool.statistics?.averageResponseTime || 0), 0) / tools.length
-        : 0,
-  };
-
-  if (isLoading) {
+  if (isInitialLoading) {
     return (
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
@@ -293,6 +329,9 @@ export default function ToolsPage() {
 
   return (
     <div className="space-y-6 p-6">
+      {/* 浮窗Loading */}
+      {isFilterLoading && <FloatingLoading message="加载中..." />}
+      
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="text-3xl font-bold tracking-tight">MCP 工具管理</h1>
@@ -314,18 +353,18 @@ export default function ToolsPage() {
             <Wrench className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-            <p className="text-muted-foreground text-xs">活跃: {stats.active}</p>
+            <div className="text-2xl font-bold">{toolStats?.total || 0}</div>
+            <p className="text-muted-foreground text-xs">活跃: {toolStats?.active || 0}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">总调用次数</CardTitle>
-            <Activity className="text-muted-foreground h-4 w-4" />
+            <TrendingUp className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalCalls.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{(toolStats?.total_calls || 0).toLocaleString()}</div>
             <p className="text-muted-foreground text-xs">所有工具累计</p>
           </CardContent>
         </Card>
@@ -336,7 +375,7 @@ export default function ToolsPage() {
             <Clock className="text-muted-foreground h-4 w-4" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.avgResponseTime.toFixed(1)}s</div>
+            <div className="text-2xl font-bold">{(toolStats?.avg_response_time || 0).toFixed(1)}s</div>
             <p className="text-muted-foreground text-xs">工具处理时间</p>
           </CardContent>
         </Card>
@@ -358,19 +397,15 @@ export default function ToolsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Filter className="h-5 w-5" />
-            筛选工具
+            筛选和搜索
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap justify-between gap-4">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
             <Tabs
               className="lg:flex-1"
               value={selectedCategory}
-              onValueChange={value => {
-                setSearchQuery('');
-                setSelectedCategory(value);
-                setPagination(prev => ({ ...prev, current_page: 1 }));
-              }}
+              onValueChange={handleFilterChange}
             >
               <TabsList className="gap-2">
                 <TabsTrigger value="all">全部</TabsTrigger>
@@ -388,7 +423,7 @@ export default function ToolsPage() {
                 id="search"
                 placeholder="搜索工具名称或描述..."
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={e => handleSearchChange(e.target.value)}
                 className="pl-8"
               />
             </div>
@@ -396,7 +431,7 @@ export default function ToolsPage() {
         </CardContent>
       </Card>
 
-      {tools.length === 0 && !isLoading ? (
+      {tools.length === 0 && !isInitialLoading && !isFilterLoading ? (
         <Card className="p-12 text-center">
           <Wrench className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
           <h3 className="mb-2 text-lg font-medium">没有找到工具</h3>
@@ -423,7 +458,6 @@ export default function ToolsPage() {
                         <CardTitle className="text-lg">{tool.name}</CardTitle>
                         <div className="mt-1 flex flex-wrap gap-2">
                           {getCategoryBadge(tool.category)}
-                          {getTypeBadge(tool.type)}
                           {tool.isActive ? (
                             <Badge variant="default" className="bg-green-100 text-xs text-green-800">
                               运行中
@@ -483,7 +517,7 @@ export default function ToolsPage() {
                     </div>
                   </div>
 
-                  {/* 统计信息和权限 */}
+                  {/* 统计信息 */}
                   <div className="bg-muted/50 space-y-3 rounded-lg p-3">
                     {/* 统计信息 */}
                     {tool.statistics && tool.isActive && (
@@ -508,17 +542,6 @@ export default function ToolsPage() {
                       </div>
                     )}
 
-                    {/* 权限信息 */}
-                    <div className="space-y-2">
-                      <p className="text-muted-foreground text-xs">权限等级</p>
-                      <div className="flex flex-wrap gap-1">
-                        {tool.permissions.map(permission => (
-                          <Badge key={permission} variant="outline" className="text-xs">
-                            {toolPermissions.find(item => item.value === permission)?.label || permission}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
                   </div>
 
                   {/* 操作按钮 */}

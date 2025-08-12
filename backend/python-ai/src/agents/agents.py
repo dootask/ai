@@ -5,8 +5,8 @@ from agents.chatbot import chatbot
 from agents.command_agent import command_agent
 from agents.interrupt_agent import interrupt_agent
 from agents.knowledge_base_agent import kb_agent
-from agents.langgraph_supervisor_agent import supervisor_agent
-from agents.rag_assistant import rag_assistant
+from agents.supervisor_agent import supervisor_agent
+# from agents.rag_assistant import rag_assistant
 # from agents.research_assistant import research_assistant
 from agents.mcp_agent import mcp_agent
 from langgraph.graph.state import CompiledStateGraph
@@ -33,21 +33,21 @@ agents: dict[str, Agent] = {
     #     description="A research assistant with web search and calculator.",
     #     graph=research_assistant,
     # ),
-    "rag-agent": Agent(
-        description="A RAG assistant with access to information in a database.",
-        graph=rag_assistant,
-    ),
+    # "rag_agent": Agent(
+    #     description="A RAG assistant with access to information in a database.",
+    #     graph=rag_assistant,
+    # ),
     "mcp_agent": Agent(description="A mcp agent.", graph=mcp_agent),
     "command-agent": Agent(description="A command agent.", graph=command_agent),
     "bg-task-agent": Agent(description="A background task agent.", graph=bg_task_agent),
-    "langgraph-supervisor-agent": Agent(
+    "supervisor_agent": Agent(
         description="A langgraph supervisor agent", graph=supervisor_agent
     ),
     "interrupt-agent": Agent(
         description="An agent the uses interrupts.", graph=interrupt_agent
     ),
-    "knowledge-base-agent": Agent(
-        description="A retrieval-augmented generation agent using Amazon Bedrock Knowledge Base",
+    "rag_agent": Agent(
+        description="A retrieval-augmented generation agent using pg Knowledge Base",
         graph=kb_agent,
     ),
 }

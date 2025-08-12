@@ -18,6 +18,9 @@ interface KnowledgeBaseResponse {
   embedding_model: string;
   chunk_size: number;
   chunk_overlap: number;
+  api_key?: string | null;
+  provider: string; // 新增
+  proxy_url?: string | null; // 新增
   metadata: unknown;
   is_active: boolean;
   created_at: string;
@@ -40,17 +43,6 @@ interface DocumentListData {
   items: KnowledgeBaseDocument[];
 }
 
-// 知识库表单数据类型
-interface KnowledgeBaseFormData {
-  name: string;
-  description?: string;
-  embedding_model: string;
-  chunk_size?: number;
-  chunk_overlap?: number;
-  metadata?: Record<string, unknown>;
-  is_active?: boolean;
-}
-
 // 文档表单数据类型
 interface DocumentFormData {
   title: string;
@@ -59,6 +51,34 @@ interface DocumentFormData {
   file_size: number;
   file_path?: string;
   metadata?: Record<string, unknown>;
+}
+
+// 知识库创建数据类型
+interface KnowledgeBaseCreateData {
+  name: string;
+  description?: string;
+  embedding_model: string;
+  chunk_size?: number;
+  chunk_overlap?: number;
+  api_key?: string;
+  provider: string;
+  proxy_url?: string;
+  metadata?: Record<string, unknown>;
+  is_active?: boolean;
+}
+
+// 知识库更新数据类型
+interface KnowledgeBaseUpdateData {
+  name?: string;
+  description?: string;
+  embedding_model?: string;
+  chunk_size?: number;
+  chunk_overlap?: number;
+  api_key?: string;
+  provider?: string;
+  proxy_url?: string;
+  metadata?: Record<string, unknown>;
+  is_active?: boolean;
 }
 
 // 知识库管理API
@@ -88,14 +108,14 @@ export const knowledgeBasesApi = {
   },
 
   // 创建知识库
-  create: async (data: KnowledgeBaseFormData): Promise<KnowledgeBase> => {
+  create: async (data: KnowledgeBaseCreateData): Promise<KnowledgeBase> => {
     const requestData = formatCreateRequestForAPI(data);
     const response = await axiosInstance.post<KnowledgeBase>('/knowledge-bases', requestData);
     return response.data;
   },
 
   // 更新知识库
-  update: async (id: number, data: Partial<KnowledgeBaseFormData>): Promise<KnowledgeBase> => {
+  update: async (id: number, data: KnowledgeBaseUpdateData): Promise<KnowledgeBase> => {
     const requestData = formatUpdateRequestForAPI(data);
     const response = await axiosInstance.put<KnowledgeBase>(`/knowledge-bases/${id}`, requestData);
     return response.data;
@@ -141,22 +161,28 @@ export const knowledgeBasesApi = {
 // 辅助函数
 
 // 格式化创建请求数据
-const formatCreateRequestForAPI = (data: KnowledgeBaseFormData): CreateKnowledgeBaseRequest => ({
+const formatCreateRequestForAPI = (data: KnowledgeBaseCreateData): CreateKnowledgeBaseRequest => ({
   name: data.name,
   description: data.description || null,
   embedding_model: data.embedding_model,
   chunk_size: data.chunk_size,
   chunk_overlap: data.chunk_overlap,
+  api_key: data.api_key || null,
+  provider: data.provider || '', // 从外部传入
+  proxy_url: data.proxy_url || null,
   metadata: data.metadata ? JSON.stringify(data.metadata) : undefined,
 });
 
 // 格式化更新请求数据
-const formatUpdateRequestForAPI = (data: Partial<KnowledgeBaseFormData>) => ({
+const formatUpdateRequestForAPI = (data: KnowledgeBaseUpdateData) => ({
   name: data.name,
   description: data.description,
   embedding_model: data.embedding_model,
   chunk_size: data.chunk_size,
   chunk_overlap: data.chunk_overlap,
+  api_key: data.api_key,
+  provider: data.provider, // 从外部传入
+  proxy_url: data.proxy_url,
   metadata: data.metadata ? JSON.stringify(data.metadata) : undefined,
   is_active: data.is_active,
 });

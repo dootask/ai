@@ -2,24 +2,23 @@
 
 import { Badge } from '@/components/ui/badge';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { useAppContext } from '@/contexts/app-context';
-import { toolCategories, toolPermissions, toolTypes } from '@/lib/ai';
+import { toolCategories } from '@/lib/ai';
 import { agentsApi } from '@/lib/api/agents';
 import { mcpToolsApi } from '@/lib/api/mcp-tools';
 import { Agent, MCPTool } from '@/lib/types';
-import { getAllAgents, safeString } from '@/lib/utils';
-import { Bot, Edit, ExternalLink, Eye, Key, Settings, Shield, Trash2, Wrench, Zap } from 'lucide-react';
+import { getAllAgents } from '@/lib/utils';
+import { Bot, Edit, Eye, Settings, Trash2, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -32,7 +31,6 @@ export default function MCPToolDetailPage() {
   const [tool, setTool] = useState<MCPTool | null>(null);
   const [relatedAgents, setRelatedAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     const loadTool = async () => {
@@ -139,25 +137,6 @@ export default function MCPToolDetailPage() {
     }
   };
 
-  const testTool = async () => {
-    if (!tool) return;
-
-    setTesting(true);
-    try {
-      const result = await mcpToolsApi.test(tool.id);
-      if (result.success) {
-        toast.success(result.message || '工具测试成功！');
-      } else {
-        toast.error(result.message || '工具测试失败');
-      }
-    } catch (error) {
-      console.error('Failed to test tool:', error);
-      toast.error('工具测试失败');
-    } finally {
-      setTesting(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -182,6 +161,21 @@ export default function MCPToolDetailPage() {
   const currentCategory = toolCategories.find(category => category.value === tool.category) || {
     label: tool.category,
     color: 'bg-gray-500 text-white',
+  };
+
+  const getConfigTypeDisplayName = (configTypeName: string) => {
+    switch (configTypeName) {
+      case 'streamable_http':
+        return 'Streamable HTTP';
+      case 'websocket':
+        return 'WebSocket';
+      case 'sse':
+        return 'Server-Sent Events';
+      case 'stdio':
+        return 'Standard I/O';
+      default:
+        return configTypeName;
+    }
   };
 
   return (
@@ -217,10 +211,11 @@ export default function MCPToolDetailPage() {
             </Badge>
           </div>
           <p className="text-muted-foreground max-w-2xl">{tool.description}</p>
-          <p className="text-muted-foreground">类型：{toolTypes.find(type => type.value === tool.type)?.label}</p>
+
         </div>
         <div className="flex gap-3">
-          <Button variant="outline" onClick={testTool} disabled={testing}>
+          {/* todo: 测试工具 */}
+          {/* <Button variant="outline" onClick={testTool} disabled={testing}>
             {testing ? (
               <>
                 <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -232,7 +227,7 @@ export default function MCPToolDetailPage() {
                 测试工具
               </>
             )}
-          </Button>
+          </Button> */}
           <Button variant="outline" asChild>
             <Link href={`/tools/${tool.id}/edit`}>
               <Edit className="mr-2 h-4 w-4" />
@@ -264,16 +259,17 @@ export default function MCPToolDetailPage() {
                   <p className="text-sm">{tool.name}</p>
                 </div>
                 <div>
+                  <h4 className="text-muted-foreground text-sm font-medium">MCP工具标识</h4>
+                  <p className="text-sm font-mono">{tool.mcpName || '-'}</p>
+                </div>
+                <div>
                   <h4 className="text-muted-foreground text-sm font-medium">工具类别</h4>
                   <div className="flex items-center gap-2">
                     <div className={`h-3 w-3 rounded-full ${currentCategory.color}`}></div>
                     <p className="text-sm">{currentCategory.label}</p>
                   </div>
                 </div>
-                <div>
-                  <h4 className="text-muted-foreground text-sm font-medium">工具类型</h4>
-                  <p className="text-sm">{toolTypes.find(type => type.value === tool.type)?.label}</p>
-                </div>
+
                 <div>
                   <h4 className="text-muted-foreground text-sm font-medium">状态</h4>
                   <Badge variant={tool.isActive ? 'default' : 'secondary'}>{tool.isActive ? '活跃' : '停用'}</Badge>
@@ -303,52 +299,38 @@ export default function MCPToolDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {tool.type === 'external' && Boolean(tool.config.baseUrl) && (
-                <div>
-                  <h4 className="text-muted-foreground mb-2 text-sm font-medium">API 基础地址</h4>
-                  <div className="flex items-center gap-2">
-                    <ExternalLink className="text-muted-foreground h-4 w-4" />
-                    <p className="font-mono text-sm break-all">{safeString(tool.config.baseUrl)}</p>
+              {/* 配置类型 */}
+              <div>
+                <h4 className="text-muted-foreground mb-2 text-sm font-medium">配置类型</h4>
+                <Badge variant="outline">
+                  {getConfigTypeDisplayName(tool.configTypeName || 'streamable_http')}
+                </Badge>
+              </div>
+
+              {/* 配置信息显示 */}
+              <div>
+                <h4 className="text-muted-foreground mb-2 text-sm font-medium">配置详情</h4>
+                {tool.configJson ? (
+                  <div className="rounded-md bg-muted p-3">
+                    <pre className="text-xs overflow-auto whitespace-pre-wrap">
+                      {tool.configJson}
+                    </pre>
                   </div>
-                </div>
-              )}
-              {Boolean(tool.config.apiKey) && (
-                <div>
-                  <h4 className="text-muted-foreground mb-2 text-sm font-medium">API 密钥</h4>
-                  <div className="flex items-center gap-2">
-                    <Key className="text-muted-foreground h-4 w-4" />
-                    <p className="font-mono text-sm">{'••••••••••••' + safeString(tool.config.apiKey).slice(-4)}</p>
+                ) : Object.keys(tool.config || {}).length > 0 ? (
+                  <div className="rounded-md bg-muted p-3">
+                    <pre className="text-xs overflow-auto whitespace-pre-wrap">
+                      {JSON.stringify(tool.config, null, 2)}
+                    </pre>
                   </div>
-                </div>
-              )}
-              {Boolean(tool.config.endpoint) && (
-                <div>
-                  <h4 className="text-muted-foreground mb-2 text-sm font-medium">API 端点</h4>
-                  <p className="font-mono text-sm">{safeString(tool.config.endpoint)}</p>
-                </div>
-              )}
-              {Object.keys(tool.config).length === 0 && <p className="text-muted-foreground text-sm">暂无配置信息</p>}
+                ) : (
+                  <p className="text-muted-foreground text-sm">暂无配置信息</p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
           {/* 权限设置 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                权限设置
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {tool.permissions.map(permission => (
-                  <Badge key={permission} variant="outline">
-                    {toolPermissions.find(item => item.value === permission)?.label || permission}
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+
         </div>
 
         {/* 右侧状态和设置 */}
@@ -367,7 +349,8 @@ export default function MCPToolDetailPage() {
                 <span className="text-muted-foreground text-sm">关联智能体</span>
                 <span className="font-medium">{relatedAgents.length}</span>
               </div>
-              <div className="pt-2">
+              {/* todo: 测试工具 */}
+              {/* <div className="pt-2">
                 <Button onClick={testTool} disabled={testing} className="w-full">
                   {testing ? (
                     <>
@@ -381,12 +364,12 @@ export default function MCPToolDetailPage() {
                     </>
                   )}
                 </Button>
-              </div>
+              </div> */}
             </CardContent>
           </Card>
 
-          {/* 使用统计 */}
-          <Card>
+          {/* todo: 使用统计, 无法获取使用的具体是哪个工具 */}
+          {/* <Card>
             <CardHeader>
               <CardTitle>使用统计</CardTitle>
             </CardHeader>
@@ -413,7 +396,7 @@ export default function MCPToolDetailPage() {
                 </span>
               </div>
             </CardContent>
-          </Card>
+          </Card> */}
 
           {/* 关联智能体 */}
           <Card>

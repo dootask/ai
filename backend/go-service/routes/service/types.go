@@ -1,5 +1,10 @@
 package service
 
+import (
+	"encoding/json"
+	"time"
+)
+
 // WebhookRequest 机器人webhook请求
 type WebhookRequest struct {
 	Text       string         `json:"text" form:"text"`               // 消息文本
@@ -70,6 +75,21 @@ type StreamErrorData struct {
 	}
 }
 
+// StreamToolData 工具数据结构
+type StreamToolData struct {
+	Type          string              `json:"type"`
+	UsageMetadata StreamUsageMetadata `json:"usage_metadata"`
+	ToolCalls     []StreamToolCall    `json:"tool_calls"`
+}
+
+// StreamToolCall 工具调用
+type StreamToolCall struct {
+	ID   string `json:"id"`
+	Args any    `json:"args"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
 // DooTaskMessage DooTask消息结构
 type DooTaskMessage struct {
 	Type string                `json:"Type"`
@@ -98,4 +118,15 @@ func (m DooTaskMessage) ExtractText() string {
 
 func (m DooTaskMessage) IsTextMessage() bool {
 	return m.Type == "text"
+}
+
+// CreateMessage 创建消息结构
+type CreateMessage struct {
+	Req          WebhookRequest
+	Content      string           `json:"content"`
+	StartTime    time.Time        `json:"start_time"`
+	Status       int              `json:"status"`
+	InputTokens  int              `json:"input_tokens"`
+	OutputTokens int              `json:"output_tokens"`
+	McpUsed      *json.RawMessage `json:"mcp_used"`
 }

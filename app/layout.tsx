@@ -1,10 +1,12 @@
+import { MainLayout } from '@/app/main';
 import { AppSidebar } from '@/components/app-sidebar';
 import ProtectedRoute from '@/components/protected-route';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppProvider } from '@/contexts/app-context';
 import { DootaskProvider } from '@/contexts/dootask-context';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { headers } from "next/headers";
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -15,8 +17,14 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const headersList = await headers()
+  const theme = headersList.get("x-theme") || undefined
+
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" className={theme} suppressHydrationWarning>
+      <head>
+        <meta name="color-scheme" content="light dark" />
+      </head>
       <body className={inter.className}>
         <AppProvider>
           <DootaskProvider>
@@ -24,14 +32,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <SidebarProvider>
                 <div className="flex h-screen w-full">
                   <AppSidebar />
-                  <main className="flex flex-1 flex-col">
-                    {/* 移动端触发按钮 */}
-                    <div className="sticky top-0 z-10 flex items-center gap-2 border-b bg-white p-4 md:hidden">
-                      <SidebarTrigger />
-                      <h1 className="text-lg font-semibold">DooTask AI</h1>
-                    </div>
-                    <div className="flex-1">{children}</div>
-                  </main>
+                  <MainLayout>{children}</MainLayout>
                 </div>
               </SidebarProvider>
             </ProtectedRoute>

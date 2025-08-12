@@ -1,12 +1,11 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from agents import DEFAULT_AGENT
+from api import encrypt, is_from_swagger, verify_bearer
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import StreamingResponse
 from langsmith import Client as LangsmithClient
-
-from agents import DEFAULT_AGENT
-from api import verify_bearer
 from schema import (ChatHistory, ChatHistoryInput, ChatMessage, Feedback,
                     FeedbackResponse, StreamInput, UserInput)
 from service.chat_service import ChatService
@@ -23,7 +22,7 @@ chat_service = ChatService()
 
 @router.post("/{agent_id}/invoke")
 @router.post("/invoke")
-async def invoke(user_input: UserInput, agent_id: str = DEFAULT_AGENT) -> ChatMessage:
+async def invoke(request: Request, user_input: UserInput, agent_id: str = DEFAULT_AGENT) -> ChatMessage:
     """
     调用代理获取最终响应
     
@@ -31,8 +30,17 @@ async def invoke(user_input: UserInput, agent_id: str = DEFAULT_AGENT) -> ChatMe
     使用 thread_id 来持久化和继续多轮对话。run_id 参数也会附加到消息中用于记录反馈。
     使用 user_id 来在多个线程间持久化和继续对话。
     """
+    if is_from_swagger(request.headers.get("referer", "")):
+        user_input.agent_config["api_key"] = encrypt(user_input.agent_config.get("api_key"))
+        for rag_config in user_input.rag_config:
+            if rag_config.get("api_key"):
+                rag_config["api_key"] = encrypt(rag_config.get("api_key"))
+        
     try:
-        return await chat_service.invoke_agent(user_input, agent_id)
+        callback = None
+        if getattr(request.app.state, 'langfuse_handler', None):
+            callback = request.app.state.langfuse_handler
+        return await chat_service.invoke_agent(callback, user_input, agent_id)
     except Exception as e:
         logger.exception(f"An exception occurred: {e}")
         raise HTTPException(status_code=500, detail="Unexpected error")
@@ -60,7 +68,7 @@ def _sse_response_example() -> dict[int | str, Any]:
     response_class=StreamingResponse,
 )
 async def stream(
-    user_input: StreamInput, agent_id: str = DEFAULT_AGENT
+    request: Request, user_input: StreamInput, agent_id: str = DEFAULT_AGENT
 ) -> StreamingResponse:
     """
     流式传输代理对用户输入的响应，包括中间消息和令牌
@@ -71,8 +79,17 @@ async def stream(
     
     设置 `stream_tokens=false` 来返回中间消息但不逐令牌返回。
     """
+    if is_from_swagger(request.headers.get("referer", "")):
+        user_input.agent_config["api_key"] = encrypt(user_input.agent_config.get("api_key"))
+        for rag_config in user_input.rag_config:
+            if rag_config.get("api_key"):
+                rag_config["api_key"] = encrypt(rag_config.get("api_key"))
+        
+    callback = None
+    if getattr(request.app.state, 'langfuse_handler', None):
+        callback = request.app.state.langfuse_handler
     return StreamingResponse(
-        chat_service.message_generator(user_input, agent_id),
+        chat_service.message_generator(callback, user_input, agent_id),
         media_type="text/event-stream",
     )
 
