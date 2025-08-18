@@ -45,6 +45,7 @@ PROVIDER_MODEL_MAPPING = {
         "class": ChatOpenAI,
         "params": {
             "streaming": True,
+            "stream_usage": True,
         },
         "required_fields": ["api_key"],
         "param_mapping": {
@@ -59,6 +60,7 @@ PROVIDER_MODEL_MAPPING = {
         "class": ChatAnthropic,
         "params": {
             "streaming": True,
+            "stream_usage": True,
         },
         "required_fields": ["api_key"],
         "param_mapping": {
@@ -83,7 +85,10 @@ PROVIDER_MODEL_MAPPING = {
     },
     "xai": {
         "class": ChatXAI,
-        "params": {},
+        "params": {
+            "streaming": True,
+            "stream_usage": True,
+        },
         "required_fields": ["api_key"],
         "param_mapping": {
             "model": "model",
@@ -97,6 +102,7 @@ PROVIDER_MODEL_MAPPING = {
         "class": ChatDeepSeek,
         "params": {
             "streaming": True,
+            "stream_usage": True,
         },
         "required_fields": ["api_key"],
         "param_mapping": {
@@ -111,8 +117,7 @@ PROVIDER_MODEL_MAPPING = {
         "class": AzureChatOpenAI,
         "params": {
             "streaming": True,
-            "timeout": 60,
-            "max_retries": 3,
+            "stream_usage": True,
         },
         "required_fields": ["api_key", "base_url"],
         "param_mapping": {
@@ -145,6 +150,7 @@ PROVIDER_MODEL_MAPPING = {
         "class": ChatOpenAI,
         "params": {
             "streaming": True,
+            "stream_usage": True
         },
         "required_fields": ["api_key","base_url"],
         "param_mapping": {
@@ -160,6 +166,7 @@ PROVIDER_MODEL_MAPPING = {
         "class": ChatQwQ,
         "params": {
             "streaming": True,
+            "stream_usage": True
         },
         "required_fields": ["api_key"],
         "param_mapping": {
@@ -174,7 +181,7 @@ PROVIDER_MODEL_MAPPING = {
     "cohere": {
         "class": ChatCohere,
         "params": {
-            "streaming": True,
+            "streaming": True
         },
         "required_fields": ["cohere_api_key"],
         "param_mapping": {
@@ -189,6 +196,7 @@ PROVIDER_MODEL_MAPPING = {
         "class": ChatOpenAI,
         "params": {
             "streaming": True,
+            "stream_usage": True
         },
         "required_fields": ["api_key"],
         "param_mapping": {
@@ -276,10 +284,9 @@ def get_model_by_provider(
     if cfg("proxy_url"):
         os.environ["https_proxy"] = cfg("proxy_url")
         os.environ["http_proxy"] = cfg("proxy_url")
-    try:
-        model = model_class(**model_params)
-    finally:
-        if cfg("proxy_url"):
-            os.environ.pop("https_proxy", None)
-            os.environ.pop("http_proxy", None)
+    else:
+        os.environ.pop("https_proxy", None)
+        os.environ.pop("http_proxy", None)
+
+    model = model_class(**model_params)
     return model
