@@ -108,6 +108,7 @@ PROVIDER_MODEL_MAPPING = {
         "param_mapping": {
             "model": "model",
             "api_key": "api_key",
+            "api_base": "api_base",
             "openai_proxy": "openai_proxy",
             "temperature": "temperature",
             "max_tokens": "max_tokens",
@@ -256,7 +257,7 @@ def get_model_by_provider(
     for config_key, _ in provider_config["param_mapping"].items():
         if config_key == "model":
             model_params[config_key] = model_name
-        elif config_key == "azure_endpoint":
+        elif config_key == "azure_endpoint"  or config_key == "api_base":
             model_params[config_key] = cfg("base_url", None)
         elif config_key == "deployment_name":
             model_params[config_key] = model_name
