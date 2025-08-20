@@ -37,18 +37,11 @@ type Response struct {
 func NewHTTPClient(baseURL string, options ...func(*HTTPClient)) *HTTPClient {
 	client := &HTTPClient{
 		client: &http.Client{
-			Timeout: 30 * time.Second,
-			Transport: &http.Transport{
-				DisableKeepAlives:   true, // 禁用 Keep-Alive
-				MaxIdleConns:        0,    // 不保持空闲连接
-				MaxIdleConnsPerHost: 0,    // 每个主机不保持空闲连接
-				IdleConnTimeout:     0,    // 空闲连接超时时间
-			},
+			Timeout: 300 * time.Second,
 		},
 		baseURL:    baseURL,
 		headers:    make(map[string]string),
-		timeout:    30 * time.Second,
-		maxRetries: 3,
+		maxRetries: 2,
 		retryDelay: 1 * time.Second,
 	}
 
