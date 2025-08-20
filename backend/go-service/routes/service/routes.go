@@ -212,15 +212,18 @@ func (h *Handler) Stream(c *gin.Context) {
 		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "AI模型未启用")
 		return
 	}
+	// 防重复请求：检查是否已经有客户端在处理这个流
+	lockKey := fmt.Sprintf("stream_lock:%s", streamId)
+	isLocked, err := global.Redis.SetNX(context.Background(), lockKey, "1", time.Minute*5).Result()
 
-	// 请求AI
-	resp, err := h.requestAI(aiModel, agent, req)
-	if err != nil {
-		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", err.Error())
-		return
+	var needRequestAI bool = false
+	if err == nil && isLocked {
+		// 获取锁成功，需要请求AI
+		needRequestAI = true
+		// 确保在函数结束时释放锁
+		defer global.Redis.Del(context.Background(), lockKey)
 	}
-
-	defer resp.Body.Close()
+	// 如果锁已存在，直接进入流式处理，从Redis读取数据
 
 	// 创建 DooTask 客户端
 	client := utils.NewDooTaskClient(req.Token)
@@ -239,8 +242,19 @@ func (h *Handler) Stream(c *gin.Context) {
 	// 记录开始时间
 	startTime := time.Now()
 
-	// 启动协程写入AI响应到Redis
-	go handler.writeAIResponseToRedis(ctx, resp.Body, req, startTime)
+	// 如果需要请求AI，启动协程写入AI响应到Redis
+	if needRequestAI {
+		// 请求AI
+		resp, err := h.requestAI(aiModel, agent, req)
+		if err != nil {
+			c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", err.Error())
+			return
+		}
+		defer resp.Body.Close()
+
+		// 启动协程写入AI响应到Redis
+		go handler.writeAIResponseToRedis(ctx, resp.Body, req, startTime)
+	}
 
 	// 流式消息读取，阻塞式BRPop
 	isFirstLine := true

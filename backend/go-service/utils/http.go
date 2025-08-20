@@ -38,6 +38,12 @@ func NewHTTPClient(baseURL string, options ...func(*HTTPClient)) *HTTPClient {
 	client := &HTTPClient{
 		client: &http.Client{
 			Timeout: 30 * time.Second,
+			Transport: &http.Transport{
+				DisableKeepAlives:   true, // 禁用 Keep-Alive
+				MaxIdleConns:        0,    // 不保持空闲连接
+				MaxIdleConnsPerHost: 0,    // 每个主机不保持空闲连接
+				IdleConnTimeout:     0,    // 空闲连接超时时间
+			},
 		},
 		baseURL:    baseURL,
 		headers:    make(map[string]string),
