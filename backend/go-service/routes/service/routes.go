@@ -168,85 +168,120 @@ func (h *Handler) Stream(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream; charset=utf-8")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
+	c.Header("Access-Control-Allow-Origin", "*")
+	c.Header("Access-Control-Allow-Headers", "Cache-Control")
+	c.Header("X-Accel-Buffering", "no")
+
+	// 立即刷新响应头到客户端
+	c.Writer.Flush()
 
 	// 获取流ID
 	streamId := c.Param("streamId")
 
-	cache, err := global.Redis.Get(context.Background(), fmt.Sprintf("stream:%s", streamId)).Result()
+	// 检查请求是否正在处理
+	streamKey := fmt.Sprintf("stream_processing:%s", streamId)
+	isNewRequest, err := global.Redis.SetNX(context.Background(), streamKey, 1, 10*time.Minute).Result()
+	if err != nil {
+		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "检查流状态失败")
+		return
+	}
 
-	// 判断流式消息是否存在
+	// 如果不是新请求，直接从Redis读取数据
+	if !isNewRequest {
+		h.streamFromRedis(c)
+		return
+	}
+
+	// 是新请求，启动goroutine请求AI并将结果存入Redis
+	go func() {
+		// 在goroutine结束时删除处理标记
+		defer global.Redis.Del(context.Background(), streamKey)
+
+		cache, err := global.Redis.Get(context.Background(), fmt.Sprintf("stream:%s", streamId)).Result()
+		if err != nil {
+			// 无法直接向客户端发送错误，记录日志
+			c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "获取流缓存失败")
+			return
+		}
+
+		var req WebhookRequest
+		if err := json.Unmarshal([]byte(cache), &req); err != nil {
+			c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "解析流缓存失败")
+			return
+		}
+
+		var agent agents.Agent
+		if err := global.DB.Where("bot_id = ?", req.BotUid).First(&agent).Error; err != nil {
+			c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "智能体不存在")
+			return
+		}
+
+		// 检查智能体是否启用
+		if !agent.IsActive {
+			c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "智能体未启用")
+			return
+		}
+
+		// 检查AI模型是否存在
+		var aiModel aimodels.AIModel
+		if err := global.DB.Where("id = ?", agent.AIModelID).First(&aiModel).Error; err != nil {
+			c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "AI模型不存在")
+			return
+		}
+
+		// 检查AI模型是否启用
+		if aiModel.IsEnabled == nil || !*aiModel.IsEnabled {
+			c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "AI模型未启用")
+			return
+		}
+
+		// 请求AI
+		resp, err := h.requestAI(aiModel, agent, req)
+
+		if err != nil {
+			errorMsg := fmt.Sprintf(`{"type":"error","content":"%s"}`, "请求AI服务失败")
+			global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", streamId), errorMsg)
+			global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", streamId), "[DONE]")
+			return
+		}
+		defer resp.Body.Close()
+
+		client := utils.NewDooTaskClient(req.Token)
+		global.DooTaskClient = &client
+
+		handler := NewMessageHandler(global.DB, global.DooTaskClient.Client)
+		startTime := time.Now()
+
+		// 写入AI响应到Redis
+		handler.writeAIResponseToRedis(context.Background(), resp.Body, req, startTime)
+
+	}()
+
+	// 主线程也从Redis读取并返回给客户端
+	h.streamFromRedis(c)
+}
+
+// streamFromRedis 从Redis读取流式数据并发送到客户端
+func (h *Handler) streamFromRedis(c *gin.Context) {
+	streamId := c.Param("streamId")
+	startTime := time.Now()
+	ctx := context.Background()
+	cache, err := global.Redis.Get(ctx, fmt.Sprintf("stream:%s", streamId)).Result()
 	if err != nil {
 		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "流式消息不存在")
 		return
 	}
-
-	// 反序列化流式消息
 	var req WebhookRequest
-	if err := json.Unmarshal([]byte(cache), &req); err != nil {
-		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "流式消息错误")
-		return
-	}
-
-	// 检查智能体是否存在
-	var agent agents.Agent
-	if err := global.DB.Where("bot_id = ?", req.BotUid).First(&agent).Error; err != nil {
-		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "智能体不存在")
-		return
-	}
-
-	// 检查智能体是否启用
-	if !agent.IsActive {
-		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "智能体未启用")
-		return
-	}
-
-	// 检查AI模型是否存在
-	var aiModel aimodels.AIModel
-	if err := global.DB.Where("id = ?", agent.AIModelID).First(&aiModel).Error; err != nil {
-		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "AI模型不存在")
-		return
-	}
-
-	// 检查AI模型是否启用
-	if aiModel.IsEnabled == nil || !*aiModel.IsEnabled {
-		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "AI模型未启用")
-		return
-	}
-
-	// 请求AI
-	resp, err := h.requestAI(aiModel, agent, req)
-	if err != nil {
-		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", err.Error())
-		return
-	}
-
-	defer resp.Body.Close()
+	json.Unmarshal([]byte(cache), &req)
 
 	// 创建 DooTask 客户端
 	client := utils.NewDooTaskClient(req.Token)
 	global.DooTaskClient = &client
-
-	// 创建带超时的context
-	ctx, cancel := context.WithTimeout(context.Background(), StreamTimeout)
-	defer func() {
-		cancel()
-		// 清理Redis资源
-		global.Redis.Del(context.Background(), fmt.Sprintf("stream_message:%s", req.StreamId))
-	}()
-
-	// 创建消息处理器
 	handler := NewMessageHandler(global.DB, global.DooTaskClient.Client)
-	// 记录开始时间
-	startTime := time.Now()
-
-	// 启动协程写入AI响应到Redis
-	go handler.writeAIResponseToRedis(ctx, resp.Body, req, startTime)
-
 	// 流式消息读取，阻塞式BRPop
 	isFirstLine := true
 
 	previousMessageType := ""
-
 	c.Stream(func(w io.Writer) bool {
 		for {
 			// 检查context是否已取消

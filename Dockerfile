@@ -94,10 +94,14 @@ source /web/python-ai/.venv/bin/activate
 
 # 设置Python路径
 # export PATH="/web/python-ai/.venv/bin:$PATH"
-
+if [ -f "/web/.env" ]; then
+    WORKERS=$(cat /web/.env | grep UVICORN_WORKERS | awk -F'=' '{print $2}' | sed 's/\r$//g')
+else
+    WORKERS=4
+fi
 # 启动Python AI服务
 cd /web/python-ai
-uvicorn main:app --host 0.0.0.0 --port 8001 --env-file /web/.env &
+uvicorn main:app --host 0.0.0.0 --port 8001 --workers $WORKERS --env-file /web/.env &
 
 # 启动Go后端服务
 cd /web

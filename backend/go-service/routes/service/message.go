@@ -196,7 +196,7 @@ func (h *MessageHandler) createMessage(createMessage CreateMessage) {
 
 	var conversation conversations.Conversation
 	dialogId := strconv.Itoa(int(createMessage.Req.DialogId))
-	userID := strconv.Itoa(int(global.DooTaskUser.UserID))
+	userID := strconv.Itoa(int(createMessage.Req.MsgUid))
 	if err := h.db.Where("agent_id = ? AND dootask_user_id = ? AND dootask_chat_id = ?", agent.ID, userID, dialogId).First(&conversation).Error; err != nil {
 		logError("查询对话失败", err, "dialog_id:", dialogId, "user_id:", userID)
 		return
@@ -245,8 +245,11 @@ func logError(message string, err error, fields ...string) {
 // writeAIResponseToRedis 写入AI响应到Redis
 func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.ReadCloser, req WebhookRequest, startTime time.Time) {
 	defer func() {
+		redisKey := fmt.Sprintf("stream_message:%s", req.StreamId)
 		// 确保写入协程结束时发送结束信号
-		global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", req.StreamId), "[DONE]")
+		global.Redis.LPush(context.Background(), redisKey, "[DONE]")
+		// 设置过期时间，防止客户端未消费导致内存泄漏
+		global.Redis.Expire(context.Background(), redisKey, 10*time.Minute)
 	}()
 
 	reader := bufio.NewReader(body)

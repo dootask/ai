@@ -35,7 +35,7 @@ export function DootaskProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setCapsuleConfig({
       top: isLargeScreen ? 20 : 12,
-      right: isLargeScreen ? 24 : 30
+      right: isLargeScreen ? 24 : 20
     })
   }, [isLargeScreen])
 

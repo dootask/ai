@@ -37,12 +37,11 @@ type Response struct {
 func NewHTTPClient(baseURL string, options ...func(*HTTPClient)) *HTTPClient {
 	client := &HTTPClient{
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 300 * time.Second,
 		},
 		baseURL:    baseURL,
 		headers:    make(map[string]string),
-		timeout:    30 * time.Second,
-		maxRetries: 3,
+		maxRetries: 2,
 		retryDelay: 1 * time.Second,
 	}
 
