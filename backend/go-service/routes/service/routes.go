@@ -10,7 +10,6 @@ import (
 	mcptools "dootask-ai/go-service/routes/api/mcp-tools"
 	"dootask-ai/go-service/utils"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -144,7 +143,11 @@ func (h *Handler) Webhook(c *gin.Context) {
 	}
 
 	// 使用rune处理Unicode字符，确保正确截取多字节字符
-	text := h.buildUserMessage(req)
+	text, err := h.buildUserMessage(req)
+	if err != nil {
+		fmt.Println("构建用户消息失败:", err)
+		return
+	}
 	runes := []rune(text)
 	if len(runes) > 200 {
 		text = string(runes[:200]) + "..."
@@ -239,7 +242,7 @@ func (h *Handler) Stream(c *gin.Context) {
 		resp, err := h.requestAI(aiModel, agent, req)
 
 		if err != nil {
-			errorMsg := fmt.Sprintf(`{"type":"error","content":"%s"}`, "请求AI服务失败")
+			errorMsg := fmt.Sprintf(`{"type":"error","content":"%s"}`, err.Error())
 			global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", streamId), errorMsg)
 			global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", streamId), "[DONE]")
 			return
@@ -389,9 +392,10 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 		threadId = ""
 	}
 
-	text := h.buildUserMessage(req)
-	if text == "" {
-		return nil, errors.New("用户消息为空")
+	text, err := h.buildUserMessage(req)
+	if err != nil {
+		fmt.Println("requestAI buildUserMessage error:", err)
+		return nil, err
 	}
 
 	// 发送POST请求获取流式响应
@@ -473,14 +477,14 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 
 	resp, err := httpClient.Stream(context.Background(), path, nil, nil, http.MethodPost, data, "application/json")
 	if err != nil {
-		return nil, errors.New("请求AI失败")
+		return nil, err
 	}
 
 	return resp, nil
 }
 
 // 构建用户消息
-func (h *Handler) buildUserMessage(req WebhookRequest) string {
+func (h *Handler) buildUserMessage(req WebhookRequest) (string, error) {
 	text := ""
 	if req.DialogType == "group" {
 		messageList, err := global.DooTaskClient.Client.GetMessageList(dootask.GetMessageListRequest{
@@ -512,13 +516,14 @@ func (h *Handler) buildUserMessage(req WebhookRequest) string {
 				})
 				if err != nil {
 					fmt.Println("转换消息失败:", err)
+					return "", err
 				}
 				text = convertMessage.Msg
 			}
 		}
 	}
 
-	return text
+	return text, nil
 }
 
 // parseMessageFromAny 将any类型安全地转换为DooTaskMessage

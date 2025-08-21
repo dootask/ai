@@ -96,19 +96,19 @@ source /web/python-ai/.venv/bin/activate
 # export PATH="/web/python-ai/.venv/bin:$PATH"
 if [ -f "/web/.env" ]; then
     WORKERS=$(cat /web/.env | grep UVICORN_WORKERS | awk -F'=' '{print $2}' | sed 's/\r$//g')
-else
-    WORKERS=4
 fi
+[ -z "$WORKERS" ] && WORKERS=4
 # 启动Python AI服务
 cd /web/python-ai
 uvicorn main:app --host 0.0.0.0 --port 8001 --workers $WORKERS --env-file /web/.env &
 
 # 启动Go后端服务
 cd /web
-./go-service &
+# ./go-service &
 
 # 启动前端
-node /web/server.js
+node /web/server.js &
+exec ./go-service
 EOF
 
 # 设置权限

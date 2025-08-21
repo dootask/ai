@@ -110,6 +110,8 @@ func (h *MessageHandler) handleMessageMessage(v StreamLineData, req WebhookReque
 
 // parseErrorContent 解析错误内容
 func (h *MessageHandler) parseErrorContent(content string) (*StreamErrorData, error) {
+	originalContent := content
+
 	// 使用正则表达式匹配 "Error code: XXX - " 格式，支持任意错误码
 	// 先尝试匹配标准格式
 	if strings.Contains(content, "Error code:") {
@@ -130,11 +132,13 @@ func (h *MessageHandler) parseErrorContent(content string) (*StreamErrorData, er
 	content = strings.ReplaceAll(content, "'", "\"")
 	content = strings.ReplaceAll(content, "None", "null")
 
-	var StreamErrorData StreamErrorData
-	if err := json.Unmarshal([]byte(content), &StreamErrorData); err != nil {
-		return nil, err
+	var data StreamErrorData
+	if err := json.Unmarshal([]byte(content), &data); err != nil {
+		// JSON解析失败时，将原始content作为错误信息返回
+		data.Error.Message = originalContent
+		return &data, nil
 	}
-	return &StreamErrorData, nil
+	return &data, nil
 }
 
 // handleErrorMessage 处理error类型消息
