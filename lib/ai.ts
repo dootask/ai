@@ -106,28 +106,28 @@ export const embeddingModels = [
   },
 
   // Voyage AI Embedding 模型
-  {
-    value: 'voyage-large-2',
-    label: 'Voyage Large v2',
-    provider: 'voyage',
-    description: '专业检索优化的embedding模型',
-    dimensions: 1536,
-    maxTokens: 16000,
-    cost: '中',
-    costPer1M: 0.12,
-    features: ['检索优化', '长文本支持'],
-  },
-  {
-    value: 'voyage-code-2',
-    label: 'Voyage Code v2',
-    provider: 'voyage',
-    description: '专门为代码优化的embedding模型',
-    dimensions: 1536,
-    maxTokens: 16000,
-    cost: '中',
-    costPer1M: 0.12,
-    features: ['代码优化', '语义搜索'],
-  },
+  // {
+  //   value: 'voyage-large-2',
+  //   label: 'Voyage Large v2',
+  //   provider: 'voyage',
+  //   description: '专业检索优化的embedding模型',
+  //   dimensions: 1536,
+  //   maxTokens: 16000,
+  //   cost: '中',
+  //   costPer1M: 0.12,
+  //   features: ['检索优化', '长文本支持'],
+  // },
+  // {
+  //   value: 'voyage-code-2',
+  //   label: 'Voyage Code v2',
+  //   provider: 'voyage',
+  //   description: '专门为代码优化的embedding模型',
+  //   dimensions: 1536,
+  //   maxTokens: 16000,
+  //   cost: '中',
+  //   costPer1M: 0.12,
+  //   features: ['代码优化', '语义搜索'],
+  // },
 
   // Azure OpenAI
   {
