@@ -1,5 +1,6 @@
 'use client';
 
+import { defaultPagination, Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,47 +8,74 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { agentsApi } from '@/lib/api/agents';
-import { Agent } from '@/lib/types';
+import { Agent, PaginationBase } from '@/lib/types';
+import { openDialogUserid } from '@dootask/tools';
 import { MessageCircle, Search, TrendingUp, User } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export default function PopularAgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
+  const [displayedAgents, setDisplayedAgents] = useState<Agent[]>([]);
+  const [pagination, setPagination] = useState<PaginationBase>(defaultPagination);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [timeFilter, setTimeFilter] = useState('all');
+  const [timeFilter, setTimeFilter] = useState('week');
 
-  useEffect(() => {
-    loadAgents();
-  }, []);
+  const handleStartConversation = (bot_id?: number) => {
+    if (bot_id !== undefined) {
+      openDialogUserid(bot_id).then(() => {}).catch(() => console.error('打开对话窗口失败'));
+    }
+  };
 
-  useEffect(() => {
-    filterAgents();
-  }, [agents, searchTerm, categoryFilter, timeFilter]);
-
-  const loadAgents = async () => {
+  // 加载智能体数据
+  const loadAgents = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await agentsApi.listAll();
-      // 按会话数量排序（模拟热度排序）
-      console.log(response);
+      // 构建请求参数，包含时间过滤
+      const params: any = {
+        page: pagination.current_page, 
+        page_size: pagination.page_size
+      };
       
+      // 添加时间过滤参数
+      if (timeFilter !== 'all') {
+        let days = 7; // 默认一周
+        if (timeFilter === 'month') {
+          days = 30;
+        } else if (timeFilter === 'quarter') {
+          days = 90;
+        }
+        
+        const filterTimestamp = new Date().getTime() - (days * 24 * 60 * 60 * 1000);
+        params.filters = {
+          create_at: filterTimestamp
+        };
+      }
+      
+      const response = await agentsApi.listAll(params);
+      // 按会话数量排序（模拟热度排序）
       const sortedAgents = response.data.items.sort((a: Agent, b: Agent) => {
-        // 这里使用 id 作为模拟的会话数量，实际应该使用真实的会话统计数据
         return (b.statistics?.week_messages || 0) - (a.statistics?.week_messages || 0);
       });
       setAgents(sortedAgents);
+      // 更新分页信息
+      setPagination(prev => ({
+        ...prev,
+        total_items: sortedAgents.length,
+        total_pages: Math.ceil((sortedAgents.length) / prev.page_size)
+      }));
     } catch (error) {
       console.error('加载智能体失败:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.current_page, pagination.page_size, timeFilter]);
 
-  const filterAgents = () => {
+  // 过滤智能体
+  const filterAgents = useCallback(() => {
     let filtered = [...agents];
 
     // 搜索过滤
@@ -77,30 +105,42 @@ export default function PopularAgentsPage() {
       });
     }
 
-    // 时间过滤（基于创建时间）
-    if (timeFilter !== 'all') {
-      const now = new Date();
-      filtered = filtered.filter(agent => {
-        if (!agent.created_at) return true;
-        const createdAt = new Date(agent.created_at);
-        const diffTime = now.getTime() - createdAt.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        switch (timeFilter) {
-          case 'week':
-            return diffDays <= 7;
-          case 'month':
-            return diffDays <= 30;
-          case 'quarter':
-            return diffDays <= 90;
-          default:
-            return true;
-        }
-      });
-    }
+    // 时间过滤已移至服务端处理，不再在客户端过滤
 
     setFilteredAgents(filtered);
+  }, [agents, searchTerm, categoryFilter]);
+
+  // 分页显示智能体
+  const paginateAgents = useCallback(() => {
+    // 现在分页在服务端处理，直接使用过滤后的数据
+    setDisplayedAgents(filteredAgents);
+  }, [filteredAgents]);
+
+  // 页面切换处理
+  const handlePageChange = (page: number) => {
+    setPagination(prev => ({ ...prev, current_page: page }));
   };
+
+  // 每页数量切换处理
+  const handlePageSizeChange = (size: number) => {
+    setPagination(prev => ({
+      ...prev,
+      page_size: size,
+      current_page: 1
+    }));
+  };
+
+  useEffect(() => {
+    loadAgents();
+  }, [loadAgents]);
+
+  useEffect(() => {
+    filterAgents();
+  }, [filterAgents]);
+
+  useEffect(() => {
+    paginateAgents();
+  }, [paginateAgents]);
 
   const getAgentCategory = (description: string) => {
     const desc = description.toLowerCase();
@@ -112,7 +152,6 @@ export default function PopularAgentsPage() {
   };
 
   const getPopularityScore = (agent: Agent) => {
-    // 模拟热度分数，实际应该基于真实的会话数据
     return agent.statistics?.week_messages || 0;
   };
 
@@ -153,6 +192,11 @@ export default function PopularAgentsPage() {
               </CardContent>
             </Card>
           ))}
+        </div>
+        
+        {/* 分页骨架屏 */}
+        <div className="mt-6 flex justify-center">
+          <Skeleton className="h-10 w-48" />
         </div>
       </div>
     );
@@ -205,10 +249,10 @@ export default function PopularAgentsPage() {
               <SelectValue placeholder="创建时间" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">所有时间</SelectItem>
               <SelectItem value="week">最近一周</SelectItem>
               <SelectItem value="month">最近一月</SelectItem>
               <SelectItem value="quarter">最近三月</SelectItem>
+              <SelectItem value="all">所有时间</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -216,7 +260,7 @@ export default function PopularAgentsPage() {
         {/* 结果统计 */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            找到 {filteredAgents.length} 个智能体
+            找到 {filteredAgents.length} 个智能体，显示第 {pagination.current_page} 页
           </p>
           <Button
             variant="outline"
@@ -224,7 +268,7 @@ export default function PopularAgentsPage() {
             onClick={() => {
               setSearchTerm('');
               setCategoryFilter('all');
-              setTimeFilter('all');
+              setTimeFilter('week');
             }}
           >
             清除筛选
@@ -247,80 +291,100 @@ export default function PopularAgentsPage() {
             onClick={() => {
               setSearchTerm('');
               setCategoryFilter('all');
-              setTimeFilter('all');
+              setTimeFilter('week');
             }}
           >
             清除所有筛选
           </Button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredAgents.map((agent, index) => (
-            <Card key={agent.id} className="hover:shadow-lg transition-shadow duration-200">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-base">{agent.name}</CardTitle>
-                      <div className="flex items-center gap-2 mt-1">
-                        <Badge variant="secondary" className="text-xs">
-                          {getAgentCategory(agent.description || '')}
-                        </Badge>
-                        {index < 3 && (
-                          <Badge variant="default" className="text-xs">
-                            🔥 热门
-                          </Badge>
-                        )}
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {displayedAgents.map((agent, index) => {
+              // 计算全局排名（考虑分页）
+              const globalIndex = (pagination.current_page - 1) * pagination.page_size + index;
+              return (
+                <Card key={agent.id} className="hover:shadow-lg transition-shadow duration-200">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <User className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-base">{agent.name}</CardTitle>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="secondary" className="text-xs">
+                              {getAgentCategory(agent.description || '')}
+                            </Badge>
+                            {globalIndex < 3 && (
+                              <Badge variant="default" className="text-xs">
+                                🔥 热门
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-primary">
+                          #{globalIndex + 1}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          排名
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-primary">
-                      #{index + 1}
+                  </CardHeader>
+                  <CardContent>
+                    <CardDescription className="mb-4 line-clamp-3">
+                      {agent.description || '暂无描述'}
+                    </CardDescription>
+                    
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <MessageCircle className="h-4 w-4" />
+                          <span>{getPopularityScore(agent)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <TrendingUp className="h-4 w-4" />
+                          <span>热度</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      排名
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <CardDescription className="mb-4 line-clamp-3">
-                  {agent.description || '暂无描述'}
-                </CardDescription>
-                
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <MessageCircle className="h-4 w-4" />
-                      <span>{getPopularityScore(agent)}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <TrendingUp className="h-4 w-4" />
-                      <span>热度</span>
-                    </div>
-                  </div>
-                </div>
 
-                <div className="flex gap-2">
-                  <Button asChild size="sm" className="flex-1">
-                    <Link href={`/agents/${agent.id}`}>
-                      查看详情
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" size="sm">
-                    <Link href={`/conversations?agent=${agent.id}`}>
-                      开始对话
-                    </Link>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                    <div className="flex gap-2">
+                      <Button asChild size="sm" className="flex-1">
+                        <Link href={`/agents/${agent.id}`}>
+                          查看详情
+                        </Link>
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleStartConversation(agent.bot_id)}
+                      >
+                        开始对话
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* 分页组件 */}
+          <div className="mt-8">
+            <Pagination
+              currentPage={pagination.current_page}
+              totalPages={pagination.total_pages}
+              pageSize={pagination.page_size}
+              totalItems={pagination.total_items}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
+          </div>
+        </>
       )}
     </div>
   );

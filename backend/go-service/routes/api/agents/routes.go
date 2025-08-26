@@ -113,6 +113,16 @@ func ListAgents(c *gin.Context) {
 		query = query.Where("is_active = ?", *filters.IsActive)
 	}
 
+	if filters.CreateAT != nil {
+		createTime := time.Unix(*filters.CreateAT/1000, (*filters.CreateAT%1000)*1000000)
+		query = query.Where("created_at >= ?", createTime)
+	}
+
+	if filters.UpdateAT != nil {
+		updateTime := time.Unix(*filters.UpdateAT/1000, (*filters.UpdateAT%1000)*1000000)
+		query = query.Where("updated_at >= ?", updateTime)
+	}
+
 	// 获取总数
 	var total int64
 	if err := query.Count(&total).Error; err != nil {

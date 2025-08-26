@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useAppContext } from '@/contexts/app-context';
+import { useDootaskContext } from '@/contexts/dootask-context';
 import { agentsApi } from '@/lib/api/agents';
 import { aiModelsApi } from '@/lib/api/ai-models';
 import { AgentResponse, AIModelConfig } from '@/lib/types';
@@ -29,14 +30,15 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<AgentResponse | null>(null);
   const [aiModel, setAiModel] = useState<AIModelConfig | null>(null);
   const [loading, setLoading] = useState(true);
-
+  const { dooTaskUser, isAdmin } = useDootaskContext();
+  
   useEffect(() => {
     const loadAgent = async () => {
       try {
         const agentId = parseInt(params.id as string);
         const response = await agentsApi.get(agentId);
         setAgent(response);
-
+        
         // 加载关联的AI模型
         if (response.ai_model_id) {
           try {
@@ -131,18 +133,20 @@ export default function AgentDetailPage() {
           </div>
           <p className="text-muted-foreground max-w-2xl">{agent.description || '暂无描述'}</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" asChild>
-            <Link href={`/agents/${agent.id}/edit`}>
-              <Edit className="mr-2 h-4 w-4" />
-              编辑
-            </Link>
-          </Button>
-          <Button variant="destructive" onClick={handleDelete}>
-            <Trash2 className="mr-2 h-4 w-4" />
-            删除
-          </Button>
-        </div>
+        {dooTaskUser?.userid === agent.user_id && (
+          <div className="flex gap-3">
+            <Button variant="outline" asChild>
+              <Link href={`/agents/${agent.id}/edit`}>
+                <Edit className="mr-2 h-4 w-4" />
+                编辑
+              </Link>
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              删除
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">

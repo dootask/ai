@@ -126,6 +126,10 @@ export interface Agent {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  user_id: number;
+
+  // 机器人id
+  bot_id?: number;
 
   // 关联的AI模型对象
   ai_model?: AIModelConfig | null;

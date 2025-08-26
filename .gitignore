@@ -50,3 +50,4 @@ tmp/
 
 # dev data
 dev-data/
+.codebuddy/

@@ -89,6 +89,8 @@ type AgentFilters struct {
 	Search    string `json:"search" form:"search"`           // 搜索关键词
 	AIModelID *int64 `json:"ai_model_id" form:"ai_model_id"` // AI模型ID过滤
 	IsActive  *bool  `json:"is_active" form:"is_active"`     // 状态过滤
+	CreateAT  *int64 `json:"create_at" form:"create_at"`     // 创建时间过滤（时间戳）
+	UpdateAT  *int64 `json:"update_at" form:"update_at"`     // 更新时间过滤（时间戳）
 }
 
 // AgentListData 智能体列表数据结构
