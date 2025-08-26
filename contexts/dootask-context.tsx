@@ -2,15 +2,10 @@
 
 import {
   DooTaskUserInfo,
-  getUserInfo,
-  interceptBack,
-  isMainElectron as isMainElectronTool,
-  isSubElectron as isSubElectronTool,
-  setCapsuleConfig,
+  setCapsuleConfig
 } from '@dootask/tools';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { storage } from '../lib/storage';
-
 interface DootaskContextType {
   loading: boolean;
   error: string | null;
@@ -73,16 +68,29 @@ export function DootaskProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         // 并行执行独立的异步操作
-        const [interceptCleanup, isMainElec, isSubElec, dooTaskUser] = await Promise.all([
-          interceptBack(beforeClose),
-          isMainElectronTool(),
-          isSubElectronTool(),
-          getUserInfo(),
-        ]);
+        // const [interceptCleanup, isMainElec, isSubElec, dooTaskUser] = await Promise.all([
+        //   interceptBack(beforeClose),
+        //   isMainElectronTool(),
+        //   isSubElectronTool(),
+        //   getUserInfo(),
+        // ]);
 
-        cleanInterceptBack.current = interceptCleanup;
-        setIsMainElectron(isMainElec);
-        setIsSubElectron(isSubElec);
+        // cleanInterceptBack.current = interceptCleanup;
+        // setIsMainElectron(isMainElec);
+        // setIsSubElectron(isSubElec);
+        const dooTaskUser: DooTaskUserInfo = {
+          userid: 1001,
+          identity: ['admin'],
+          department: [1],
+          email: 'admin@company.com',
+          tel: '13912345678',
+          nickname: '管理员',
+          profession: '系统管理员',
+          userimg: '/avatars/admin.png',
+          bot: 0,
+          created_at: new Date().toISOString(),
+          token: 'mock-jwt-token'
+        };
         setDooTaskUser(dooTaskUser);
         setIsAdmin(dooTaskUser?.identity?.includes('admin') ?? false);
         storage.setItem('authToken', dooTaskUser?.token ?? '');

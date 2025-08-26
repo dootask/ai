@@ -44,7 +44,23 @@ export const agentsApi = {
     });
     return response.data;
   },
+  // 获取全部智能体列表
+  listAll: async (
+    params: Partial<PaginationRequest> & { filters?: AgentFilters } = { page: 1, page_size: 12 }
+  ): Promise<PaginationResponse<AgentListData>> => {
+    const defaultParams: PaginationRequest = {
+      page: 1,
+      page_size: 12,
+      sorts: [{ key: 'created_at', desc: true }],
+      filters: params.filters || {},
+    };
 
+    const requestParams = { ...defaultParams, ...params };
+    const response = await axiosInstance.get<PaginationResponse<AgentListData>>('/agents/all', {
+      params: requestParams,
+    });
+    return response.data;
+  },
   // 获取智能体详情
   get: async (id: number): Promise<AgentResponse> => {
     const response = await axiosInstance.get<AgentResponse>(`/agents/${id}`);

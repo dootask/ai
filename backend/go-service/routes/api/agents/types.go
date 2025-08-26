@@ -42,6 +42,7 @@ type Agent struct {
 type AgentStatistics struct {
 	TotalMessages       int64   `json:"total_messages"`
 	TodayMessages       int64   `json:"today_messages"`
+	WeekMessages        int64   `json:"week_messages"`
 	AverageResponseTime float64 `json:"average_response_time"`
 	SuccessRate         float64 `json:"success_rate"`
 }

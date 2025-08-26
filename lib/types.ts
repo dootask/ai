@@ -141,6 +141,7 @@ export interface Agent {
 export interface AgentStatistics {
   total_messages: number;
   today_messages: number;
+  week_messages: number;
   average_response_time: number;
   success_rate: number;
 }
