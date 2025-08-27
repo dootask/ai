@@ -30,6 +30,7 @@ interface KnowledgeBaseFormData {
   chunkSize?: number;
   chunkOverlap?: number;
   apiKey?: string;
+  base_url?: string,
   proxyUrl?: string; // 保留：非必填
   metadata?: Record<string, unknown>;
 }
@@ -44,6 +45,7 @@ export default function CreateKnowledgeBasePage() {
     chunkSize: 1000,
     chunkOverlap: 200,
     apiKey: '',
+    base_url: '',
     proxyUrl: '', // 新增：非必填
   });
 
@@ -85,6 +87,7 @@ export default function CreateKnowledgeBasePage() {
         chunk_size: formData.chunkSize,
         chunk_overlap: formData.chunkOverlap,
         api_key: formData.apiKey || undefined,
+        base_url: formData.base_url || undefined,
         provider: selectedModel.provider, // 从选中的模型中提取
         proxy_url: formData.proxyUrl || undefined,
         is_active: true,
@@ -211,6 +214,20 @@ export default function CreateKnowledgeBasePage() {
                       <p>模型：{selectedModel.label}</p>
                     </div>
                   )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>API 基础地址</Label>
+                  <Input
+                    placeholder='某些模型需要填写base_url地址'
+                    value={formData.base_url}
+                    onChange={e => setFormData(prev => ({ ...prev, base_url: e.target.value }))}
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    {formData.base_url
+                      ? `当前地址：${formData.base_url}`
+                      : '请填写API基础地址'}
+                  </p>
                 </div>
 
                 <div className="space-y-2">

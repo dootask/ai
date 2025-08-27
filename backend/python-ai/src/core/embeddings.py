@@ -73,7 +73,6 @@ EMBEDDINGS_PROVIDER_MAPPING = {
     "cohere": {
         "class": CohereEmbeddings,
         "params": {},
-        "required_fields": ["cohere_api_key"],
         "param_mapping": {
             "model": "model",
             "base_url": "base_url",
@@ -133,7 +132,7 @@ def get_embeddings_by_provider(
             model_params[config_key] = model_name
         elif config_key == "openai_proxy":
             model_params[config_key] = cfg("proxy_url")
-        elif config_key == "api_key":
+        elif config_key == "api_key" or config_key == "cohere_api_key":
             model_params[config_key] = decrypt(cfg("api_key"))
         else:
             value = cfg(config_key)

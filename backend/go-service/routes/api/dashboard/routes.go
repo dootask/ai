@@ -234,10 +234,11 @@ func getMessageStats() MessageStats {
 	// 计算平均响应时间
 	var averageResponseTime sql.NullFloat64
 	global.DB.Raw(`
-		SELECT avg(m.response_time_ms) FROM agents a
-		LEFT JOIN conversations c ON a.id = c.agent_id
-		LEFT JOIN messages m ON c.id= m.conversation_id
-		WHERE a.user_id = ? AND m.status = 1 AND m.role = 'assistant' AND m.response_time_ms > 0
+		SELECT AVG(m.response_time_ms) 
+		FROM agents a
+		INNER JOIN conversations c ON c.agent_id = a.id AND c.is_active = true
+		INNER JOIN messages m ON m.conversation_id = c.id AND m.response_time_ms > 0
+		WHERE a.user_id = ? AND a.is_active = true
 	`, userID).Scan(&averageResponseTime)
 
 	stats.AverageResponseTime = averageResponseTime.Float64 / 1000.0

@@ -10,7 +10,6 @@ import {
 } from '@dootask/tools';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { storage } from '../lib/storage';
-
 interface DootaskContextType {
   loading: boolean;
   error: string | null;
@@ -83,6 +82,7 @@ export function DootaskProvider({ children }: { children: React.ReactNode }) {
         cleanInterceptBack.current = interceptCleanup;
         setIsMainElectron(isMainElec);
         setIsSubElectron(isSubElec);
+
         setDooTaskUser(dooTaskUser);
         setIsAdmin(dooTaskUser?.identity?.includes('admin') ?? false);
         storage.setItem('authToken', dooTaskUser?.token ?? '');

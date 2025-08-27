@@ -1,6 +1,6 @@
 'use client';
 
-import { Bot, Brain, Cpu, Database, Home, MessageSquare, Wrench } from 'lucide-react';
+import { Bot, Brain, Cpu, Database, Home, MessageSquare, TrendingUp, Wrench } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -31,6 +31,11 @@ const menuGroups = [
         title: '智能体管理',
         url: '/agents',
         icon: Bot,
+      },
+      {
+        title: '热门智能体',
+        url: '/popular',
+        icon: TrendingUp,
       },
       {
         title: '对话监控',

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
 	"dootask-ai/go-service/global"
 	knowledgebases "dootask-ai/go-service/routes/api/knowledge-bases"
@@ -25,6 +27,7 @@ func RegisterRoutes(router *gin.RouterGroup) {
 	agentGroup := router.Group("/agents")
 	{
 		agentGroup.GET("", ListAgents)                     // 获取智能体列表
+		agentGroup.GET("/all", ListAgents)                 // 获取智能体列表
 		agentGroup.POST("", CreateAgent)                   // 创建智能体
 		agentGroup.GET("/:id", GetAgent)                   // 获取智能体详情
 		agentGroup.PUT("/:id", UpdateAgent)                // 更新智能体
@@ -91,9 +94,11 @@ func ListAgents(c *gin.Context) {
 	// 构建查询
 	query := global.DB.Model(&Agent{})
 
-	// 设置默认筛选条件
-	query = query.Where("user_id = ?", global.DooTaskUser.UserID)
-
+	// 检查是否是 /all 路径，如果不是才应用 user_id 筛选
+	if !strings.HasSuffix(c.Request.URL.Path, "/all") {
+		// 设置默认筛选条件
+		query = query.Where("user_id = ?", global.DooTaskUser.UserID)
+	}
 	// 应用筛选条件
 	if filters.Search != "" {
 		searchTerm := "%" + filters.Search + "%"
@@ -106,6 +111,16 @@ func ListAgents(c *gin.Context) {
 
 	if filters.IsActive != nil {
 		query = query.Where("is_active = ?", *filters.IsActive)
+	}
+
+	if filters.CreateAT != nil {
+		createTime := time.Unix(*filters.CreateAT/1000, (*filters.CreateAT%1000)*1000000)
+		query = query.Where("created_at >= ?", createTime)
+	}
+
+	if filters.UpdateAT != nil {
+		updateTime := time.Unix(*filters.UpdateAT/1000, (*filters.UpdateAT%1000)*1000000)
+		query = query.Where("updated_at >= ?", updateTime)
 	}
 
 	// 获取总数
@@ -125,8 +140,6 @@ func ListAgents(c *gin.Context) {
 	var agents []Agent
 	if err := query.
 		Preload("AIModel").
-		Preload("Conversations").
-		Preload("Conversations.Messages").
 		Order(orderBy).
 		Limit(req.PageSize).
 		Offset(req.GetOffset()).
@@ -139,32 +152,141 @@ func ListAgents(c *gin.Context) {
 		return
 	}
 
+	// 如果没有数据，直接返回
+	if len(agents) == 0 {
+		data := AgentListData{Items: agents}
+		response := utils.NewPaginationResponse(req.Page, req.PageSize, total, data)
+		c.JSON(http.StatusOK, response)
+		return
+	}
+
+	// 优化后的平均响应时间查询
 	var averageResponseTime sql.NullFloat64
 	global.DB.Raw(`
-		SELECT avg(m.response_time_ms) FROM agents a
-		LEFT JOIN conversations c ON a.id = c.agent_id
-		LEFT JOIN messages m ON c.id= m.conversation_id
-		WHERE a.user_id = ?
+		SELECT AVG(m.response_time_ms) 
+		FROM agents a
+		INNER JOIN conversations c ON c.agent_id = a.id AND c.is_active = true
+		INNER JOIN messages m ON m.conversation_id = c.id AND m.response_time_ms > 0
+		WHERE a.user_id = ? AND a.is_active = true
 	`, global.DooTaskUser.UserID).Scan(&averageResponseTime)
 
-	// 查询统计信息
-	for i, agent := range agents {
-		// 查询知识库名称
+	// 收集所有需要查询的ID
+	var allKBIDs []int64
+	var allToolIDs []int64
+	agentKBMap := make(map[int64][]int64)
+	agentToolMap := make(map[int64][]int64)
+
+	for _, agent := range agents {
 		var kbIDs []int64
-		var kbNames []string
-		json.Unmarshal(agent.KnowledgeBases, &kbIDs)
-		global.DB.Model(&knowledgebases.KnowledgeBase{}).Where("id IN (?)", kbIDs).Pluck("name", &kbNames)
-		agent.KBNames = kbNames
-
-		// 查询工具名称
 		var toolIDs []int64
-		var toolNames []string
-		json.Unmarshal(agent.Tools, &toolIDs)
-		global.DB.Model(&mcp.MCPTool{}).Where("id IN (?)", toolIDs).Pluck("name", &toolNames)
-		agent.ToolNames = toolNames
 
+		if agent.KnowledgeBases != nil {
+			json.Unmarshal(agent.KnowledgeBases, &kbIDs)
+			agentKBMap[agent.ID] = kbIDs
+			allKBIDs = append(allKBIDs, kbIDs...)
+		}
+
+		if agent.Tools != nil {
+			json.Unmarshal(agent.Tools, &toolIDs)
+			agentToolMap[agent.ID] = toolIDs
+			allToolIDs = append(allToolIDs, toolIDs...)
+		}
+	}
+
+	// 批量查询知识库名称
+	kbNameMap := make(map[int64]string)
+	if len(allKBIDs) > 0 {
+		var kbResults []struct {
+			ID   int64  `json:"id"`
+			Name string `json:"name"`
+		}
+		global.DB.Model(&knowledgebases.KnowledgeBase{}).
+			Select("id, name").
+			Where("id IN (?)", allKBIDs).
+			Find(&kbResults)
+
+		for _, kb := range kbResults {
+			kbNameMap[kb.ID] = kb.Name
+		}
+	}
+
+	// 批量查询工具名称
+	toolNameMap := make(map[int64]string)
+	if len(allToolIDs) > 0 {
+		var toolResults []struct {
+			ID   int64  `json:"id"`
+			Name string `json:"name"`
+		}
+		global.DB.Model(&mcp.MCPTool{}).
+			Select("id, name").
+			Where("id IN (?)", allToolIDs).
+			Find(&toolResults)
+
+		for _, tool := range toolResults {
+			toolNameMap[tool.ID] = tool.Name
+		}
+	}
+
+	// 批量查询会话统计（总数和本周数）
+	conversationCountMap := make(map[int64]int64)
+	weekConversationCountMap := make(map[int64]int64)
+	if len(agents) > 0 {
+		agentIDs := make([]int64, len(agents))
+		for i, agent := range agents {
+			agentIDs[i] = agent.ID
+		}
+		now := time.Now()
+		weekStart := now.AddDate(0, 0, -int(now.Weekday())+1)
+		weekStart = time.Date(weekStart.Year(), weekStart.Month(), weekStart.Day(), 0, 0, 0, 0, weekStart.Location())
+
+		var conversationCounts []struct {
+			AgentID   int64 `json:"agent_id"`
+			Total     int64 `json:"total"`
+			WeekCount int64 `json:"week_count"`
+		}
+		global.DB.Table("conversations").
+			Select("agent_id, count(*) as total, sum(case when created_at >= ? then 1 else 0 end) as week_count", weekStart).
+			Where("agent_id IN (?)", agentIDs).
+			Where("is_active = true").
+			Group("agent_id").
+			Find(&conversationCounts)
+
+		for _, cc := range conversationCounts {
+			conversationCountMap[cc.AgentID] = cc.Total
+			weekConversationCountMap[cc.AgentID] = cc.WeekCount
+		}
+	}
+
+	// 组装数据
+	for i, agent := range agents {
+		// 设置知识库名称
+		if kbIDs, exists := agentKBMap[agent.ID]; exists {
+			var kbNames []string
+			for _, kbID := range kbIDs {
+				if name, found := kbNameMap[kbID]; found {
+					kbNames = append(kbNames, name)
+				}
+			}
+			agent.KBNames = kbNames
+		}
+
+		// 设置工具名称
+		if toolIDs, exists := agentToolMap[agent.ID]; exists {
+			var toolNames []string
+			for _, toolID := range toolIDs {
+				if name, found := toolNameMap[toolID]; found {
+					toolNames = append(toolNames, name)
+				}
+			}
+			agent.ToolNames = toolNames
+		}
+
+		// 设置统计信息
+		totalMessages := conversationCountMap[agent.ID]
+		weekMessages := weekConversationCountMap[agent.ID]
 		agent.Statistics = &AgentStatistics{
-			TotalMessages:       int64(len(agent.Conversations)),
+			TotalMessages:       totalMessages,
+			WeekMessages:        weekMessages,
 			AverageResponseTime: averageResponseTime.Float64,
 		}
 		agents[i] = agent
@@ -269,7 +391,7 @@ func CreateAgent(c *gin.Context) {
 		Name:       req.Name,
 		Session:    1,
 		ClearDay:   15,
-		WebhookURL: fmt.Sprintf("%s/service/webhook", c.GetString("base_url")),
+		WebhookURL: fmt.Sprintf("%s/service/webhook?server_url=%s", "http://nginx", c.GetString("base_url")),
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -611,7 +733,7 @@ func UpdateAgent(c *gin.Context) {
 		_, err = global.DooTaskClient.Client.UpdateBot(dootask.EditBotRequest{
 			ID:         int(*agent.BotID),
 			Name:       *req.Name,
-			WebhookURL: fmt.Sprintf("%s/service/webhook", c.GetString("base_url")),
+			WebhookURL: fmt.Sprintf("%s/service/webhook?server_url=%s", "http://nginx", c.GetString("base_url")),
 		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
