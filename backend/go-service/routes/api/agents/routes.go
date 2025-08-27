@@ -391,7 +391,7 @@ func CreateAgent(c *gin.Context) {
 		Name:       req.Name,
 		Session:    1,
 		ClearDay:   15,
-		WebhookURL: fmt.Sprintf("%s/service/webhook?server_url=%s", "http://nginx", c.GetString("base_url")),
+		WebhookURL: fmt.Sprintf("%s/service/webhook?server_url=%s", "http://nginx/apps/ai-agent", c.GetString("host")),
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -733,7 +733,7 @@ func UpdateAgent(c *gin.Context) {
 		_, err = global.DooTaskClient.Client.UpdateBot(dootask.EditBotRequest{
 			ID:         int(*agent.BotID),
 			Name:       *req.Name,
-			WebhookURL: fmt.Sprintf("%s/service/webhook?server_url=%s", "http://nginx", c.GetString("base_url")),
+			WebhookURL: fmt.Sprintf("%s/service/webhook?server_url=%s", "http://nginx/apps/ai-agent", c.GetString("host")),
 		})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{

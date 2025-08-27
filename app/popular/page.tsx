@@ -13,7 +13,13 @@ import { openDialogUserid } from '@dootask/tools';
 import { MessageCircle, Search, TrendingUp, User } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-
+interface FilterParams {
+  page: number;
+  page_size: number;
+  filters?: {
+    create_at: number;
+  };
+}
 export default function PopularAgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
@@ -35,7 +41,7 @@ export default function PopularAgentsPage() {
     try {
       setLoading(true);
       // 构建请求参数，包含时间过滤
-      const params: any = {
+      const params: FilterParams = {
         page: pagination.current_page, 
         page_size: pagination.page_size
       };

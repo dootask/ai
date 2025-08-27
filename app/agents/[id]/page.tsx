@@ -30,7 +30,7 @@ export default function AgentDetailPage() {
   const [agent, setAgent] = useState<AgentResponse | null>(null);
   const [aiModel, setAiModel] = useState<AIModelConfig | null>(null);
   const [loading, setLoading] = useState(true);
-  const { dooTaskUser, isAdmin } = useDootaskContext();
+  const { dooTaskUser } = useDootaskContext();
   
   useEffect(() => {
     const loadAgent = async () => {
