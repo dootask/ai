@@ -28,7 +28,7 @@ interface filterParams {
   filters: {
     search?: string;
     category?: string;
-    created_after?: string;
+    create_at?: number;
   };
 }
 // 防抖Hook
@@ -125,21 +125,24 @@ export default function PopularAgentsPage() {
           days = 90;
         }
         
-        const filterDate = new Date();
-        filterDate.setDate(filterDate.getDate() - days);
-        params.filters.created_after = filterDate.toISOString();
+        const filterTimestamp = new Date().getTime() - (days * 24 * 60 * 60 * 1000);
+        params.filters.create_at=filterTimestamp
       }
       
       const response = await agentsApi.listAll(params);
-      
+
       // 检查请求是否被取消
       if (controller.signal.aborted) {
         return;
       }
       
-      setAgents(response.data.items);
+      // 按会话数量排序（模拟热度排序）
+      const sortedAgents = response.data.items.sort((a: Agent, b: Agent) => {
+        return (b.statistics?.week_messages || 0) - (a.statistics?.week_messages || 0);
+      });
+      setAgents(sortedAgents);
       // setFilteredAgents(response.data.items);
-      setDisplayedAgents(response.data.items);
+      setDisplayedAgents(sortedAgents);
       
       // 更新分页信息
       setPagination(prev => ({
