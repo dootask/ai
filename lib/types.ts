@@ -153,7 +153,7 @@ export interface AgentStatistics {
 export interface CreateAgentRequest {
   name: string;
   description?: string | null;
-  prompt: string;
+  prompt?: string ;
   ai_model_id?: number | null;
   temperature: number;
   tools?: number[]; // JSONB array
@@ -164,7 +164,7 @@ export interface CreateAgentRequest {
 export interface UpdateAgentRequest {
   name?: string;
   description?: string | null;
-  prompt?: string;
+  prompt?: string ;
   ai_model_id?: number | null;
   temperature?: number;
   tools?: unknown; // JSONB array

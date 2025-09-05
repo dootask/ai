@@ -3,12 +3,12 @@
 import { CommandSelect, CommandSelectOption } from '@/components/command-select';
 import { Badge } from '@/components/ui/badge';
 import {
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbLink,
-    BreadcrumbList,
-    BreadcrumbPage,
-    BreadcrumbSeparator,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -136,7 +136,7 @@ export default function EditAgentPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || !formData.prompt.trim()) {
+    if (!formData.name.trim() || !formData.ai_model_id) {
       toast.error('请填写所有必填字段');
       return;
     }
@@ -147,14 +147,14 @@ export default function EditAgentPage() {
       const apiData = formatUpdateRequestForAPI({
         name: formData.name,
         description: formData.description || undefined,
-        prompt: formData.prompt,
+        prompt: formData.prompt || undefined,
         ai_model_id: formData.ai_model_id,
         temperature: formData.temperature,
         tools: formData.selectedToolIds,
         knowledgeBases: formData.selectedKnowledgeBaseIds,
         metadata: {},
       });
-
+      
       const updatedAgent = await agentsApi.update(parseInt(params.id as string), apiData);
       toast.success(`智能体 "${updatedAgent.name}" 更新成功！`);
       router.push(`/agents/${params.id}`);
@@ -302,14 +302,14 @@ export default function EditAgentPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="prompt">提示词内容 *</Label>
+                <Label htmlFor="prompt">提示词内容</Label>
                 <Textarea
                   id="prompt"
                   placeholder="你是一个专业的AI助手..."
                   className="min-h-32"
                   value={formData.prompt}
                   onChange={e => setFormData(prev => ({ ...prev, prompt: e.target.value }))}
-                  required
+                  
                 />
               </div>
             </CardContent>
