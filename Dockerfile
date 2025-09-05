@@ -1,5 +1,5 @@
 # 后端构建阶段
-FROM ghcr.io/apache/skywalking-go/skywalking-go:41a661492feea65015e8300205c139dcf06e99c6-go1.23 AS go-server-builder
+FROM golang:1.23.10-bookworm AS go-server-builder
 
 # 设置工作目录
 WORKDIR /app
@@ -14,8 +14,7 @@ RUN go mod tidy
 ENV GIN_MODE=release
 
 # 构建后端
-RUN /usr/local/bin/skywalking-go-agent -inject main.go
-RUN CGO_ENABLED=1 go build -toolexec="/usr/local/bin/skywalking-go-agent" -a -o go-service main.go
+RUN CGO_ENABLED=1 go build  -o go-service main.go
 
 # =============================================================
 # 前端构建阶段
