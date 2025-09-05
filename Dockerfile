@@ -1,5 +1,5 @@
 # 后端构建阶段
-FROM golang:1.23.10-bookworm AS go-server-builder
+FROM ghcr.io/apache/skywalking-go/skywalking-go:41a661492feea65015e8300205c139dcf06e99c6-go1.23 AS go-server-builder
 
 # 设置工作目录
 WORKDIR /app
@@ -14,7 +14,8 @@ RUN go mod tidy
 ENV GIN_MODE=release
 
 # 构建后端
-RUN CGO_ENABLED=1 go build -o go-service main.go
+RUN /usr/local/bin/skywalking-go-agent -inject main.go
+RUN CGO_ENABLED=1 go build -toolexec="/usr/local/bin/skywalking-go-agent" -a -o go-service main.go
 
 # =============================================================
 # 前端构建阶段
@@ -72,7 +73,7 @@ COPY backend/python-ai/src/memory/ ./memory/
 COPY backend/python-ai/src/schema/ ./schema/
 COPY backend/python-ai/src/service/ ./service/
 COPY backend/python-ai/src/main.py ./main.py
-
+COPY backend/python-ai/src/uvicorn_config.json ./uvicorn_config.json
 WORKDIR /web
 
 # 复制后端构建产物
@@ -100,7 +101,7 @@ fi
 [ -z "$WORKERS" ] && WORKERS=4
 # 启动Python AI服务
 cd /web/python-ai
-uvicorn main:app --host 0.0.0.0 --port 8001 --workers $WORKERS --env-file /web/.env &
+uvicorn main:app --host 0.0.0.0 --port 8001 --workers $WORKERS --env-file /web/.env --log-config uvicorn_config.json &
 
 # 启动Go后端服务
 cd /web
