@@ -31,8 +31,10 @@ import (
 const (
 	// 流式处理超时时间
 	StreamTimeout = 5 * time.Minute
-	// Redis读取超时时间
-	RedisReadTimeout = 5 * time.Second
+	// Redis读取超时时间 - 减少超时时间避免连接池耗尽
+	RedisReadTimeout = 2 * time.Second
+	// Redis连接最大空闲时间
+	RedisMaxIdleTime = 30 * time.Second
 )
 
 // Handler 机器人webhook处理器
@@ -267,84 +269,140 @@ func (h *Handler) Stream(c *gin.Context) {
 // streamFromRedis 从Redis读取流式数据并发送到客户端
 func (h *Handler) streamFromRedis(c *gin.Context) {
 	streamId := c.Param("streamId")
-	startTime := time.Now()
-	ctx := context.Background()
-	cache, err := global.Redis.Get(ctx, fmt.Sprintf("stream:%s", streamId)).Result()
+
+	// 获取请求信息
+	req, handler, err := h.initStreamHandler(streamId)
 	if err != nil {
-		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "流式消息不存在")
+		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", err.Error())
 		return
 	}
-	var req WebhookRequest
-	json.Unmarshal([]byte(cache), &req)
 
-	// 创建 DooTask 客户端
+	// 创建带超时的上下文
+	ctx, cancel := context.WithTimeout(context.Background(), StreamTimeout)
+	defer cancel()
+
+	// 流式状态管理
+	state := &StreamState{
+		isFirstLine:         true,
+		previousMessageType: "",
+		startTime:           time.Now(),
+	}
+
+	c.Stream(func(w io.Writer) bool {
+		return h.processStreamMessage(ctx, req, handler, state, w)
+	})
+}
+
+// initStreamHandler 初始化流处理器
+func (h *Handler) initStreamHandler(streamId string) (*WebhookRequest, *MessageHandler, error) {
+	cache, err := global.Redis.Get(context.Background(), fmt.Sprintf("stream:%s", streamId)).Result()
+	if err != nil {
+		return nil, nil, fmt.Errorf("流式消息不存在")
+	}
+
+	var req WebhookRequest
+	if err := json.Unmarshal([]byte(cache), &req); err != nil {
+		return nil, nil, fmt.Errorf("解析请求失败")
+	}
+
+	// 创建客户端和处理器
 	client := utils.NewDooTaskClient(req.Token)
 	global.DooTaskClient = &client
 	handler := NewMessageHandler(global.DB, global.DooTaskClient.Client)
-	// 流式消息读取，阻塞式BRPop
-	isFirstLine := true
 
-	previousMessageType := ""
-	c.Stream(func(w io.Writer) bool {
-		for {
-			// 检查context是否已取消
-			select {
-			case <-ctx.Done():
-				return handler.handleError(w, req, "响应超时，请重试")
-			default:
-				// 继续处理
-			}
+	return &req, handler, nil
+}
 
-			// 阻塞式读取，超时5秒
-			result, err := global.Redis.BRPop(ctx, RedisReadTimeout, fmt.Sprintf("stream_message:%s", req.StreamId)).Result()
-			if err != nil {
-				if err.Error() == "redis: nil" {
-					// 超时无数据，继续等待
-					continue
-				}
-				return handler.handleError(w, req, "获取响应失败")
-			}
-			// BRPop返回[key, value]
-			line := result[1]
+// streamState 流状态管理
+type StreamState struct {
+	isFirstLine         bool
+	previousMessageType string
+	startTime           time.Time
+	ThinkingEnd         bool
+	ThinkingContent     string
+}
 
-			if after, ok := strings.CutPrefix(line, "data:"); ok {
-				line = strings.TrimSpace(after)
-			}
+// processStreamMessage 处理单个流消息
+func (h *Handler) processStreamMessage(ctx context.Context, req *WebhookRequest, handler *MessageHandler, state *StreamState, w io.Writer) bool {
+	// 检查上下文是否已取消
+	select {
+	case <-ctx.Done():
+		return handler.handleError(w, *req, "流式响应超时")
+	default:
+	}
 
-			if line == "[DONE]" {
-				handler.handleDone(req, w)
-				return false
-			}
-
-			var v StreamLineData
-			if err := json.Unmarshal([]byte(line), &v); err != nil {
-				if len(line) > 1 {
-					logError("JSON解析失败", err, "line:", line)
-				}
-				continue
-			}
-
-			if v.Type == "thinking" {
-				if isFirstLine {
-					v.Content = fmt.Sprintf("::: reasoning\\n%s", v.Content)
-				}
-				v.IsFirst = isFirstLine
-				isFirstLine = false
-				previousMessageType = v.Type
-			}
-
-			if v.Type == "token" || v.Type == "tool" {
-				if previousMessageType == "thinking" {
-					isFirstLine = true
-					previousMessageType = ""
-				}
-				v.IsFirst = isFirstLine
-				isFirstLine = false
-			}
-
-			handler.handleMessage(v, req, w, startTime, 1)
+	// 读取消息
+	line, err := h.readStreamLine(ctx, req.StreamId)
+	if err != nil {
+		if err.Error() == "timeout" {
+			return true // 继续等待
 		}
-	})
+		return handler.handleError(w, *req, "获取响应失败")
+	}
+
+	// 处理结束信号
+	if line == "[DONE]" {
+		handler.handleDone(*req, w)
+		return false
+	}
+
+	// 解析并处理消息
+	var v StreamLineData
+	if err := json.Unmarshal([]byte(line), &v); err != nil {
+		if len(line) > 1 {
+			logError("JSON解析失败", err, "line:", line)
+		}
+		return true
+	}
+
+	// 更新消息状态
+	h.updateMessageState(&v, state)
+
+	// 处理消息
+	handler.handleMessage(v, *req, w, state.startTime, 1, *state)
+	return true
+}
+
+// readStreamLine 读取流消息行
+func (h *Handler) readStreamLine(ctx context.Context, streamId string) (string, error) {
+	result, err := global.Redis.BRPop(ctx, RedisReadTimeout, fmt.Sprintf("stream_message:%s", streamId)).Result()
+	if err != nil {
+		if err.Error() == "redis: nil" {
+			return "", fmt.Errorf("timeout")
+		}
+		return "", err
+	}
+
+	line := result[1]
+	if after, ok := strings.CutPrefix(line, "data:"); ok {
+		line = strings.TrimSpace(after)
+	}
+	return line, nil
+}
+
+// updateMessageState 更新消息状态
+func (h *Handler) updateMessageState(v *StreamLineData, state *StreamState) {
+	switch v.Type {
+	case "thinking":
+		state.ThinkingContent += fmt.Sprintf("%v", v.Content)
+		if state.isFirstLine {
+			v.Content = fmt.Sprintf("::: reasoning\\n%s", v.Content)
+		}
+		v.IsFirst = state.isFirstLine
+		state.isFirstLine = false
+		state.previousMessageType = v.Type
+		state.ThinkingEnd = false
+
+	case "token", "tool":
+		if state.previousMessageType == "thinking" {
+			v.IsFirst = true
+			state.ThinkingEnd = true
+			state.previousMessageType = ""
+			return
+		}
+		v.IsFirst = false
+		state.ThinkingEnd = false
+	}
 }
 
 // 解析响应数据
