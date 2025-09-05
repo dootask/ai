@@ -15,7 +15,7 @@ type Agent struct {
 	UserID         int64          `gorm:"not null;index" json:"user_id"`
 	Name           string         `gorm:"type:varchar(255);not null" json:"name" validate:"required,max=255"`
 	Description    *string        `gorm:"type:text" json:"description"`
-	Prompt         string         `gorm:"type:text;not null" json:"prompt" validate:"required"`
+	Prompt         string         `gorm:"type:text;not null" json:"prompt"`
 	BotID          *int64         `gorm:"column:bot_id" json:"bot_id"`
 	AIModelID      *int64         `gorm:"column:ai_model_id" json:"ai_model_id"`
 	Temperature    float64        `gorm:"type:decimal(3,2);default:0.7" json:"temperature" validate:"min=0,max=2"`
@@ -63,7 +63,7 @@ func (Agent) TableName() string {
 type CreateAgentRequest struct {
 	Name           string          `json:"name" validate:"required,max=255"`
 	Description    *string         `json:"description"`
-	Prompt         string          `json:"prompt" validate:"required"`
+	Prompt         string          `json:"prompt"`
 	AIModelID      *int64          `json:"ai_model_id"`
 	Temperature    float64         `json:"temperature" validate:"min=0,max=2"`
 	Tools          json.RawMessage `json:"tools"`
