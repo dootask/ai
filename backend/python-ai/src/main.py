@@ -13,12 +13,12 @@ from api.chat_api import router as chat_router
 from api.document_api import router as document_router
 from core import settings
 from dotenv import load_dotenv
-from fastapi import FastAPI,HTTPException, Security
+from fastapi import FastAPI, HTTPException, Security
 from langchain_core._api import LangChainBetaWarning
 from langfuse import Langfuse  # type: ignore[import-untyped]
+from langfuse.callback import CallbackHandler
 from memory import initialize_database, initialize_store
 from schema.schema import ServiceMetadata
-from langfuse.callback import CallbackHandler
 
 load_dotenv()
 
@@ -105,4 +105,4 @@ if __name__ == "__main__":
     import uvicorn
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    uvicorn.run("main:app", host="127.0.0.1", port=8005,reload=settings.is_dev(),env_file="../.env")
+    uvicorn.run("main:app", host="127.0.0.1", port=8005,reload=settings.is_dev(),env_file="../.env", log_config="src/uvicorn_config.json")
