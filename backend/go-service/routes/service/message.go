@@ -36,6 +36,11 @@ func NewMessageHandler(db *gorm.DB, client *dootask.Client) *MessageHandler {
 
 // sendSSEResponse 发送SSE响应
 func (h *MessageHandler) sendSSEResponse(w io.Writer, req WebhookRequest, event string, content string) {
+	if event == "thinking_end" {
+		fmt.Fprintf(w, "id: %d\nevent: %s\ndata: {\"content\": \"\\n\\n:::\\n\\n\\n\"}\n\n", req.SendId, "append")
+		event = "append"
+	}
+
 	fmt.Fprintf(w, "id: %d\nevent: %s\ndata: {\"content\": \"%s\"}\n\n", req.SendId, event, content)
 
 	// 确保立即刷新到客户端
@@ -59,7 +64,7 @@ func (h *MessageHandler) sendDooTaskMessage(req WebhookRequest, text string) {
 }
 
 // handleTokenMessage 处理token类型消息
-func (h *MessageHandler) handleTokenMessage(v StreamLineData, req WebhookRequest, w io.Writer) {
+func (h *MessageHandler) handleTokenMessage(v StreamLineData, req WebhookRequest, w io.Writer, state StreamState) {
 	if content, ok := v.Content.(string); ok {
 		// 将实际的换行符重新转义为 \n 字符串，以便前端正确显示
 		content = strings.ReplaceAll(content, "\n", "\\n")
@@ -67,7 +72,9 @@ func (h *MessageHandler) handleTokenMessage(v StreamLineData, req WebhookRequest
 		if v.IsFirst {
 			event = "replace"
 		}
-
+		if state.ThinkingEnd {
+			event = "thinking_end"
+		}
 		h.sendSSEResponse(w, req, event, content)
 	} else {
 		logError("Token消息内容类型错误", nil, "type:", v.Type, "content:", fmt.Sprintf("%v", v.Content))
@@ -75,7 +82,7 @@ func (h *MessageHandler) handleTokenMessage(v StreamLineData, req WebhookRequest
 }
 
 // handleMessageMessage 处理message类型消息
-func (h *MessageHandler) handleMessageMessage(v StreamLineData, req WebhookRequest, startTime time.Time, status int) {
+func (h *MessageHandler) handleMessageMessage(v StreamLineData, req WebhookRequest, startTime time.Time, status int, state StreamState) {
 	content, ok := v.Content.(map[string]any)
 	if !ok {
 		logError("Message消息内容类型错误", nil, "type:", v.Type, "content:", fmt.Sprintf("%v", v.Content))
@@ -95,7 +102,13 @@ func (h *MessageHandler) handleMessageMessage(v StreamLineData, req WebhookReque
 	}
 
 	// 处理可能包含HTML的内容
-	processedContent := h.processHTMLContent(StreamMessageData.Content)
+	var processedContent string
+	if state.ThinkingContent != "" {
+		processedContent = h.processHTMLContent(fmt.Sprintf("::: reasoning\n%s\n\n:::\n\n\n%s", state.ThinkingContent, StreamMessageData.Content))
+	} else {
+		processedContent = h.processHTMLContent(StreamMessageData.Content)
+	}
+	logError("Thinking消息", nil, "type:", state.ThinkingContent)
 
 	h.createMessage(CreateMessage{
 		Req:          req,
@@ -176,12 +189,12 @@ func (h *MessageHandler) handleDone(req WebhookRequest, w io.Writer) {
 }
 
 // handleMessage 根据消息类型分发处理
-func (h *MessageHandler) handleMessage(v StreamLineData, req WebhookRequest, w io.Writer, startTime time.Time, status int) {
+func (h *MessageHandler) handleMessage(v StreamLineData, req WebhookRequest, w io.Writer, startTime time.Time, status int, state StreamState) {
 	switch v.Type {
 	case "token", "thinking", "tool":
-		h.handleTokenMessage(v, req, w)
+		h.handleTokenMessage(v, req, w, state)
 	case "message":
-		h.handleMessageMessage(v, req, startTime, status)
+		h.handleMessageMessage(v, req, startTime, status, state)
 	case "error":
 		h.handleErrorMessage(v, req, w, status)
 	default:
