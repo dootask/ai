@@ -1,7 +1,16 @@
 'use client';
 
+import AgentDetail from '@/components/agent-detail';
 import { defaultPagination, Pagination } from '@/components/pagination';
 import { Badge } from '@/components/ui/badge';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,24 +20,51 @@ import { agentsApi } from '@/lib/api/agents';
 import { Agent, PaginationBase } from '@/lib/types';
 import { openDialogUserid } from '@dootask/tools';
 import { MessageCircle, Search, TrendingUp, User } from 'lucide-react';
-import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-interface FilterParams {
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+interface filterParams {
   page: number;
   page_size: number;
-  filters?: {
-    create_at: number;
+  filters: {
+    search?: string;
+    category?: string;
+    created_after?: string;
   };
 }
+// 防抖Hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
 export default function PopularAgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
+  // const [filteredAgents, setFilteredAgents] = useState<Agent[]>([]);
   const [displayedAgents, setDisplayedAgents] = useState<Agent[]>([]);
   const [pagination, setPagination] = useState<PaginationBase>(defaultPagination);
   const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [timeFilter, setTimeFilter] = useState('week');
+  const [timeFilter, setTimeFilter] = useState('all'); // 默认显示最近一周
+  const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
+
+  // 使用防抖来优化搜索体验
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+  
+  // 用于取消之前的请求
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const handleStartConversation = (bot_id?: number) => {
     if (bot_id !== undefined) {
@@ -36,17 +72,51 @@ export default function PopularAgentsPage() {
     }
   };
 
-  // 加载智能体数据
-  const loadAgents = useCallback(async () => {
+  const handleViewDetail = (agentId: number) => {
+    setSelectedAgentId(agentId);
+  };
+
+  const handleBackToList = () => {
+    setSelectedAgentId(null);
+  };
+
+  // 加载智能体数据 - 添加请求取消机制防止竞态
+  const loadAgents = useCallback(async (loadType: 'initial' | 'search' | 'pagination' = 'initial') => {
+    // 取消之前的请求
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    // 创建新的 AbortController
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    
     try {
-      setLoading(true);
-      // 构建请求参数，包含时间过滤
-      const params: FilterParams = {
+      // 根据加载类型设置不同的加载状态
+      if (loadType === 'initial' ) {
+        setLoading(true);
+      } else if (loadType === 'search'|| loadType === 'pagination') {
+        setSearching(true);
+      } 
+      
+      // 构建请求参数，包含搜索、分类和时间过滤
+      const params: filterParams = {
         page: pagination.current_page, 
-        page_size: pagination.page_size
+        page_size: pagination.page_size,
+        filters: {}
       };
       
-      // 添加时间过滤参数
+      // 添加搜索过滤参数
+      if (debouncedSearchTerm.trim()) {
+        params.filters.search = debouncedSearchTerm.trim();
+      }
+      
+      // 添加类别过滤参数 (需要后端支持category字段)
+      if (categoryFilter !== 'all') {
+        params.filters.category = categoryFilter;
+      }
+      
+      // 添加时间过滤参数 (需要后端支持created_after字段)
       if (timeFilter !== 'all') {
         let days = 7; // 默认一周
         if (timeFilter === 'month') {
@@ -55,98 +125,95 @@ export default function PopularAgentsPage() {
           days = 90;
         }
         
-        const filterTimestamp = new Date().getTime() - (days * 24 * 60 * 60 * 1000);
-        params.filters = {
-          create_at: filterTimestamp
-        };
+        const filterDate = new Date();
+        filterDate.setDate(filterDate.getDate() - days);
+        params.filters.created_after = filterDate.toISOString();
       }
       
       const response = await agentsApi.listAll(params);
-      // 按会话数量排序（模拟热度排序）
-      const sortedAgents = response.data.items.sort((a: Agent, b: Agent) => {
-        return (b.statistics?.week_messages || 0) - (a.statistics?.week_messages || 0);
-      });
-      setAgents(sortedAgents);
+      
+      // 检查请求是否被取消
+      if (controller.signal.aborted) {
+        return;
+      }
+      
+      setAgents(response.data.items);
+      // setFilteredAgents(response.data.items);
+      setDisplayedAgents(response.data.items);
+      
       // 更新分页信息
       setPagination(prev => ({
         ...prev,
-        total_items: sortedAgents.length,
-        total_pages: Math.ceil((sortedAgents.length) / prev.page_size)
+        total_items: response.total_items,
+        total_pages: response.total_pages
       }));
     } catch (error) {
-      console.error('加载智能体失败:', error);
+      if (error instanceof Error && error.name !== 'AbortError') {
+        console.error('加载智能体失败:', error);
+      }
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) {
+        setLoading(false);
+        setSearching(false);
+      }
     }
-  }, [pagination.current_page, pagination.page_size, timeFilter]);
+  }, [pagination.current_page, pagination.page_size, debouncedSearchTerm, categoryFilter, timeFilter]);
 
-  // 过滤智能体
-  const filterAgents = useCallback(() => {
-    let filtered = [...agents];
-
-    // 搜索过滤
-    if (searchTerm) {
-      filtered = filtered.filter(agent =>
-        agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (agent.description && agent.description.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-    }
-
-    // 类别过滤（基于描述内容进行简单分类）
-    if (categoryFilter !== 'all') {
-      filtered = filtered.filter(agent => {
-        const description = agent.description?.toLowerCase() || '';
-        switch (categoryFilter) {
-          case 'assistant':
-            return description.includes('助手') || description.includes('助理');
-          case 'creative':
-            return description.includes('创作') || description.includes('写作') || description.includes('设计');
-          case 'analysis':
-            return description.includes('分析') || description.includes('数据') || description.includes('报告');
-          case 'customer':
-            return description.includes('客服') || description.includes('服务');
-          default:
-            return true;
-        }
-      });
-    }
-
-    // 时间过滤已移至服务端处理，不再在客户端过滤
-
-    setFilteredAgents(filtered);
-  }, [agents, searchTerm, categoryFilter]);
-
-  // 分页显示智能体
-  const paginateAgents = useCallback(() => {
-    // 现在分页在服务端处理，直接使用过滤后的数据
-    setDisplayedAgents(filteredAgents);
-  }, [filteredAgents]);
+  // 重置筛选条件
+  const resetFilters = useCallback(() => {
+    setSearchTerm('');
+    setCategoryFilter('all');
+    setTimeFilter('all');
+    setPagination(prev => ({ ...prev, current_page: 1 }));
+  }, []);
 
   // 页面切换处理
-  const handlePageChange = (page: number) => {
+  const handlePageChange = useCallback((page: number) => {
     setPagination(prev => ({ ...prev, current_page: page }));
-  };
+  }, []);
 
   // 每页数量切换处理
-  const handlePageSizeChange = (size: number) => {
+  const handlePageSizeChange = useCallback((size: number) => {
     setPagination(prev => ({
       ...prev,
       page_size: size,
       current_page: 1
     }));
-  };
+  }, []);
 
+  // 统一的数据加载逻辑 - 避免多个 useEffect 相互触发
   useEffect(() => {
-    loadAgents();
-  }, [loadAgents]);
+    let loadType: 'initial' | 'search' | 'pagination' = 'initial';
+    
+    // 判断是否为初始加载
+    if (agents.length === 0 && pagination.current_page === 1 && !debouncedSearchTerm  && timeFilter === 'all') {
+      loadType = 'initial';
+    }
+    // 判断是否为搜索操作（搜索条件变化且页面重置为1）
+    else if (pagination.current_page === 1) {
+      loadType = 'search';
+    }
+    // 其他情况为分页操作
+    else {
+      loadType = 'pagination';
+    }
+    
+    loadAgents(loadType);
+    
+    // 清理函数：组件卸载时取消请求
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [pagination.current_page, pagination.page_size, debouncedSearchTerm, categoryFilter, timeFilter, loadAgents]);
 
+  // 搜索和筛选变化时重置页码 - 单独处理，不触发数据加载
   useEffect(() => {
-    filterAgents();
-  }, [filterAgents]);
-
-  useEffect(() => {
-    paginateAgents();
-  }, [paginateAgents]);
+    if (pagination.current_page !== 1) {
+      setPagination(prev => ({ ...prev, current_page: 1 }));
+    }
+  }, [debouncedSearchTerm, categoryFilter, timeFilter]);
 
   const getAgentCategory = (description: string) => {
     const desc = description.toLowerCase();
@@ -208,6 +275,38 @@ export default function PopularAgentsPage() {
     );
   }
 
+  // 如果选中了智能体，显示详情页
+  if (selectedAgentId) {
+    const selectedAgent = agents.find(agent => agent.id === selectedAgentId);
+    return (
+      <div className="container mx-auto p-6">
+        <div className="mb-6">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink 
+                  onClick={handleBackToList}
+                  className="cursor-pointer hover:text-primary"
+                >
+                  热门智能体
+                </BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{selectedAgent?.name || '智能体详情'}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+        <AgentDetail 
+          agentId={selectedAgentId} 
+          showBreadcrumb={false}
+          onDelete={handleBackToList}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6">
       {/* 页面标题 */}
@@ -236,7 +335,7 @@ export default function PopularAgentsPage() {
           </div>
 
           {/* 类别筛选 */}
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          {/* <Select value={categoryFilter} onValueChange={setCategoryFilter}>
             <SelectTrigger className="w-full sm:w-40">
               <SelectValue placeholder="选择类别" />
             </SelectTrigger>
@@ -247,7 +346,7 @@ export default function PopularAgentsPage() {
               <SelectItem value="analysis">数据分析</SelectItem>
               <SelectItem value="customer">客户服务</SelectItem>
             </SelectContent>
-          </Select>
+          </Select> */}
 
           {/* 时间筛选 */}
           <Select value={timeFilter} onValueChange={setTimeFilter}>
@@ -266,16 +365,12 @@ export default function PopularAgentsPage() {
         {/* 结果统计 */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            找到 {filteredAgents.length} 个智能体，显示第 {pagination.current_page} 页
+            找到 {pagination.total_items} 个智能体，显示第 {pagination.current_page} 页，共 {pagination.total_pages} 页
           </p>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              setSearchTerm('');
-              setCategoryFilter('all');
-              setTimeFilter('week');
-            }}
+            onClick={resetFilters}
           >
             清除筛选
           </Button>
@@ -283,27 +378,48 @@ export default function PopularAgentsPage() {
       </div>
 
       {/* 智能体卡片网格 */}
-      {filteredAgents.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4">
-            <Search className="h-8 w-8 text-muted-foreground" />
+        {searching || (loading && displayedAgents.length === 0) ? (
+          // 加载状态 - 显示骨架屏
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Card key={index}>
+                <CardHeader>
+                  <div className="flex items-center space-x-3">
+                    <Skeleton className="h-10 w-10 rounded-full" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Skeleton className="h-16 w-full mb-4" />
+                  <div className="flex justify-between items-center">
+                    <Skeleton className="h-6 w-20" />
+                    <Skeleton className="h-4 w-16" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-          <h3 className="text-lg font-medium mb-2">未找到匹配的智能体</h3>
-          <p className="text-muted-foreground mb-4">
-            尝试调整搜索条件或筛选器
-          </p>
-          <Button
-            variant="outline"
-            onClick={() => {
-              setSearchTerm('');
-              setCategoryFilter('all');
-              setTimeFilter('week');
-            }}
-          >
-            清除所有筛选
-          </Button>
-        </div>
-      ) : (
+        ) : displayedAgents.length === 0 ? (
+          // 空状态 - 无搜索结果
+          <div className="text-center py-12">
+            <div className="mx-auto w-24 h-24 bg-muted rounded-full flex items-center justify-center mb-4">
+              <Search className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium mb-2">未找到匹配的智能体</h3>
+            <p className="text-muted-foreground mb-4">
+              尝试调整搜索条件或筛选器
+            </p>
+            <Button
+              variant="outline"
+              onClick={resetFilters}
+            >
+              清除所有筛选
+            </Button>
+          </div>
+        ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {displayedAgents.map((agent, index) => {
@@ -360,10 +476,12 @@ export default function PopularAgentsPage() {
                     </div>
 
                     <div className="flex gap-2">
-                      <Button asChild size="sm" className="flex-1">
-                        <Link href={`/agents/${agent.id}`}>
-                          查看详情
-                        </Link>
+                      <Button 
+                        size="sm" 
+                        className="flex-1"
+                        onClick={() => handleViewDetail(agent.id)}
+                      >
+                        查看详情
                       </Button>
                       <Button 
                         variant="outline" 
