@@ -14,7 +14,7 @@ import type {
 interface AgentFormData {
   name: string;
   description?: string;
-  prompt: string;
+  prompt?: string;
   ai_model_id?: number | null;
   aiModelId?: number | null; // 兼容字段
   temperature: number;
@@ -112,7 +112,7 @@ export const formatCreateRequestForAPI = (data: AgentFormData): CreateAgentReque
   return {
     name: data.name,
     description: data.description || null,
-    prompt: data.prompt,
+    prompt: data.prompt || undefined,
     ai_model_id: data.ai_model_id || data.aiModelId || null,
     temperature: data.temperature,
     tools: tools as unknown as number[],
