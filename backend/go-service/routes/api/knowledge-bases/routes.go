@@ -738,43 +738,56 @@ func UploadDocument(c *gin.Context) {
 		return
 	}
 
-	// 解析JSON请求
-	var req UploadDocumentRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
+	// 解析multipart/form-data请求
+	file, header, err := c.Request.FormFile("file")
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "VALIDATION_001",
-			"message": "请求数据格式错误",
+			"message": "获取上传文件失败",
 			"data":    err.Error(),
 		})
 		return
 	}
+	defer file.Close()
 
-	// 验证请求数据
-	validate := validator.New()
-	if err := validate.Struct(&req); err != nil {
+	// 获取文件信息
+	fileName := header.Filename
+	fileSize := header.Size
+	fileType := getFileTypeFromName(fileName)
+
+	// 验证文件类型
+	allowedTypes := []string{"pdf", "docx", "doc", "md", "txt"}
+	if !contains(allowedTypes, fileType) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"code":    "VALIDATION_001",
-			"message": "数据验证失败",
-			"data":    err.Error(),
+			"message": "不支持的文件类型",
+			"data":    nil,
 		})
 		return
 	}
 
-	// 设置默认值
-	if req.Metadata == nil {
-		req.Metadata = []byte("{}")
+	// 验证文件大小 (限制为50MB)
+	maxSize := int64(50 * 1024 * 1024)
+	if fileSize > maxSize {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"code":    "VALIDATION_001",
+			"message": "文件大小超过限制(50MB)",
+			"data":    nil,
+		})
+		return
 	}
 
 	// 创建文档记录
 	doc := KBDocument{
 		KnowledgeBaseID: kbId,
-		Title:           req.Title,
-		Content:         req.Content,
-		FilePath:        req.FilePath,
-		FileType:        req.FileType,
-		FileSize:        req.FileSize,
-		Metadata:        req.Metadata,
+		Title:           fileName,
+		Content:         "", // 不再存储内容，直接传给AI服务
+		FilePath:        nil,
+		FileType:        fileType,
+		FileSize:        fileSize,
+		Metadata:        []byte("{}"),
 		IsActive:        true,
+		Status:          "processing",
 	}
 
 	if err := global.DB.Create(&doc).Error; err != nil {
@@ -786,8 +799,6 @@ func UploadDocument(c *gin.Context) {
 		return
 	}
 
-	uploadedDocs := []KBDocument{doc}
-
 	// 调用AI服务处理文档
 	baseURL := utils.GetEnvWithDefault("AI_BASE_URL", fmt.Sprintf("http://localhost:%s", utils.GetEnvWithDefault("PYTHON_AI_SERVICE_PORT", "8001")))
 	requestTimeout, _ := strconv.Atoi(utils.GetEnvWithDefault("AI_REQUEST_TIMEOUT", "60"))
@@ -798,7 +809,7 @@ func UploadDocument(c *gin.Context) {
 	)
 
 	// 启动异步处理文档
-	go func(doc KBDocument) {
+	go func(doc KBDocument, file []byte) {
 		// 准备上传参数
 		additionalParams := map[string]string{
 			"knowledge_base": kb.Name,
@@ -823,7 +834,7 @@ func UploadDocument(c *gin.Context) {
 		defer tmpFile.Close()
 
 		// 写入文件内容
-		if _, err := tmpFile.WriteString(doc.Content); err != nil {
+		if _, err := tmpFile.Write(file); err != nil {
 			// 更新文档状态为处理失败
 			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
 			fmt.Printf("写入临时文件失败: %v\n", err)
@@ -867,15 +878,15 @@ func UploadDocument(c *gin.Context) {
 		if len(uploadDocumentResponse.ProcessedFiles) == 0 {
 			// 更新文档状态为处理失败
 			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
-			fmt.Printf("上传文档到AI服务成功: %v, doc_id: %d\n", uploadDocumentResponse, doc.ID)
+			fmt.Printf("上传文档到AI服务失败，没有处理的文件: %v, doc_id: %d\n", uploadDocumentResponse, doc.ID)
 			return
 		}
 
-		for _, file := range uploadDocumentResponse.ProcessedFiles {
-			if file.Status == "success" {
+		for _, processedFile := range uploadDocumentResponse.ProcessedFiles {
+			if processedFile.Status == "success" {
 				// 更新文档状态为已处理
 				global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Updates(map[string]interface{}{
-					"chunk_index": file.Chunks,
+					"chunk_index": processedFile.Chunks,
 					"status":      "processed",
 				})
 			} else {
@@ -883,9 +894,15 @@ func UploadDocument(c *gin.Context) {
 				global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
 			}
 		}
-	}(uploadedDocs[0])
+	}(doc, func() []byte {
+		// 读取文件内容
+		fileBytes := make([]byte, fileSize)
+		file.Seek(0, 0) // 重置文件指针
+		file.Read(fileBytes)
+		return fileBytes
+	}())
 
-	c.JSON(http.StatusOK, uploadedDocs[0])
+	c.JSON(http.StatusOK, doc)
 }
 
 // DeleteDocument 删除文档
@@ -982,4 +999,37 @@ func getFileExtension(fileType string) string {
 	default:
 		return ".txt"
 	}
+}
+
+// getFileTypeFromName 从文件名获取文件类型
+func getFileTypeFromName(fileName string) string {
+	parts := strings.Split(fileName, ".")
+	if len(parts) < 2 {
+		return "txt"
+	}
+	ext := strings.ToLower(parts[len(parts)-1])
+	switch ext {
+	case "pdf":
+		return "pdf"
+	case "docx":
+		return "docx"
+	case "doc":
+		return "doc"
+	case "md", "markdown":
+		return "md"
+	case "txt":
+		return "txt"
+	default:
+		return "txt"
+	}
+}
+
+// contains 检查字符串切片是否包含指定字符串
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }

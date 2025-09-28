@@ -75,15 +75,15 @@ class DocumentService:
                 loader = TextLoader(tmp_file_path, encoding="utf-8")
             elif file_extension in [".doc", ".docx"]:
                 loader = UnstructuredWordDocumentLoader(tmp_file_path)
+                
             else:
                 raise HTTPException(
                     status_code=400,
                     detail=f"不支持的文件类型: {file_extension}"
                 )
-            
             # 加载文档
             documents = loader.load()
-            
+
             # 添加元数据
             for doc in documents:
                 doc.metadata.update({

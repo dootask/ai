@@ -60,7 +60,9 @@ dependencies = [
     "cohere <= 5.15.0",
     "langchain-postgres",
     "langchain-qwq",
-    "pycryptodome"
+    "pycryptodome",
+    "unstructured[docx]",
+    
 ]
 
 [dependency-groups]

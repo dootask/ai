@@ -31,7 +31,7 @@ type KBDocument struct {
 	ID              int64           `gorm:"primaryKey;autoIncrement" json:"id"`
 	KnowledgeBaseID int64           `gorm:"column:knowledge_base_id" json:"knowledge_base_id" validate:"required"`
 	Title           string          `gorm:"type:varchar(255);not null" json:"title" validate:"required,max=255"`
-	Content         string          `gorm:"type:text;not null" json:"content" validate:"required"`
+	Content         string          `gorm:"type:text;" json:"content" `
 	FilePath        *string         `gorm:"type:varchar(500)" json:"file_path"`
 	FileType        string          `gorm:"type:varchar(50)" json:"file_type"`
 	FileSize        int64           `json:"file_size"`
