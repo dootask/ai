@@ -149,17 +149,8 @@ export default function KnowledgeBaseDetailPage() {
     const file = files[0];
 
     try {
-      // 简化的文件上传逻辑
-      const content = await file.text(); // 对于文本文件
-      const documentData = {
-        title: file.name,
-        content: content,
-        file_type: file.name.split('.').pop()?.toLowerCase() || 'unknown',
-        file_size: file.size,
-        file_path: `/uploads/${file.name}`,
-      };
-
-      const newDocument = await knowledgeBasesApi.uploadDocument(parseInt(params.id as string), documentData);
+      // 直接上传文件，不解析内容
+      const newDocument = await knowledgeBasesApi.uploadDocument(parseInt(params.id as string), file);
 
       setDocuments(prev => [newDocument, ...prev]);
       toast.success(`文件 "${file.name}" 上传成功`);
@@ -168,6 +159,8 @@ export default function KnowledgeBaseDetailPage() {
       toast.error('文件上传失败');
     } finally {
       setUploading(false);
+      // 清空文件输入框
+      event.target.value = '';
     }
   };
 

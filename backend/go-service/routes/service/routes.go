@@ -143,7 +143,11 @@ func (h *Handler) Webhook(c *gin.Context) {
 			return
 		}
 	}
+	if req.Extras == nil {
+		req.Extras = make(map[string]any)
+	}
 
+	req.Extras["base_url"] = c.GetString("base_url")
 	// 使用rune处理Unicode字符，确保正确截取多字节字符
 	text, err := h.buildUserMessage(req)
 	if err != nil {
@@ -569,8 +573,10 @@ func (h *Handler) buildUserMessage(req WebhookRequest) (string, error) {
 				}
 				return false
 			}) {
+				result := text
+				result = strings.ReplaceAll(result, "{{RemoteURL}}", fmt.Sprintf("%v/", req.Extras["base_url"]))
 				convertMessage, err := global.DooTaskClient.Client.ConvertWebhookMessageToAI(dootask.ConvertWebhookMessageRequest{
-					Msg: text,
+					Msg: result,
 				})
 				if err != nil {
 					fmt.Println("转换消息失败:", err)

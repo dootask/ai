@@ -6,8 +6,7 @@ import type {
   KnowledgeBaseFilters,
   KnowledgeBaseListData,
   PaginationRequest,
-  PaginationResponse,
-  UploadDocumentRequest,
+  PaginationResponse
 } from '@/lib/types';
 
 // 知识库响应类型
@@ -43,15 +42,7 @@ interface DocumentListData {
   items: KnowledgeBaseDocument[];
 }
 
-// 文档表单数据类型
-interface DocumentFormData {
-  title: string;
-  content: string;
-  file_type: string;
-  file_size: number;
-  file_path?: string;
-  metadata?: Record<string, unknown>;
-}
+
 
 // 知识库创建数据类型
 interface KnowledgeBaseCreateData {
@@ -146,9 +137,19 @@ export const knowledgeBasesApi = {
   },
 
   // 上传文档
-  uploadDocument: async (id: number, data: DocumentFormData): Promise<KnowledgeBaseDocument> => {
-    const requestData = formatDocumentRequestForAPI(data);
-    const response = await axiosInstance.post<KnowledgeBaseDocument>(`/knowledge-bases/${id}/documents`, requestData);
+  uploadDocument: async (id: number, file: File): Promise<KnowledgeBaseDocument> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await axiosInstance.post<KnowledgeBaseDocument>(
+      `/knowledge-bases/${id}/documents`, 
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    );
     return response.data;
   },
 
@@ -187,15 +188,7 @@ const formatUpdateRequestForAPI = (data: KnowledgeBaseUpdateData) => ({
   is_active: data.is_active,
 });
 
-// 格式化文档请求数据
-const formatDocumentRequestForAPI = (data: DocumentFormData): UploadDocumentRequest => ({
-  title: data.title,
-  content: data.content,
-  file_type: data.file_type,
-  file_size: data.file_size,
-  file_path: data.file_path || null,
-  metadata: data.metadata ? JSON.stringify(data.metadata) : undefined,
-});
+
 
 // 创建分页请求参数的辅助函数
 export const createKnowledgeBaseListRequest = (

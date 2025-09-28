@@ -108,7 +108,6 @@ func (h *MessageHandler) handleMessageMessage(v StreamLineData, req WebhookReque
 	} else {
 		processedContent = h.processHTMLContent(StreamMessageData.Content)
 	}
-	logError("Thinking消息", nil, "type:", state.ThinkingContent)
 
 	h.createMessage(CreateMessage{
 		Req:          req,
