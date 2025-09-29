@@ -147,7 +147,7 @@ func (h *Handler) Webhook(c *gin.Context) {
 		req.Extras = make(map[string]any)
 	}
 
-	req.Extras["base_url"] = c.GetString("base_url")
+	req.Extras["base_url"] = c.GetString("host")
 	// 使用rune处理Unicode字符，确保正确截取多字节字符
 	text, err := h.buildUserMessage(req)
 	if err != nil {
@@ -243,7 +243,7 @@ func (h *Handler) Stream(c *gin.Context) {
 			c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "AI模型未启用")
 			return
 		}
-
+		req.Extras["base_url"] = c.GetString("host")
 		// 请求AI
 		resp, err := h.requestAI(aiModel, agent, req)
 
@@ -560,7 +560,8 @@ func (h *Handler) buildUserMessage(req WebhookRequest) (string, error) {
 		// 使用辅助函数提取文本消息
 		text = extractTextFromMessages(messageList)
 	} else {
-		text = req.Text
+		text = strings.ReplaceAll(req.Text, "{{RemoteURL}}", fmt.Sprintf("%v/", req.Extras["base_url"]))
+
 		if req.ReplyText != "" {
 			text = fmt.Sprintf("<quoted_content>\n%s\n</quoted_content>\n\n%s", req.ReplyText, text)
 		} else {
@@ -573,16 +574,15 @@ func (h *Handler) buildUserMessage(req WebhookRequest) (string, error) {
 				}
 				return false
 			}) {
-				result := text
-				result = strings.ReplaceAll(result, "{{RemoteURL}}", fmt.Sprintf("%v/", req.Extras["base_url"]))
 				convertMessage, err := global.DooTaskClient.Client.ConvertWebhookMessageToAI(dootask.ConvertWebhookMessageRequest{
-					Msg: result,
+					Msg: text,
 				})
 				if err != nil {
 					fmt.Println("转换消息失败:", err)
 					return "", err
 				}
 				text = convertMessage.Msg
+
 			}
 		}
 	}

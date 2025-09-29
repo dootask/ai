@@ -27,7 +27,7 @@ func BaseMiddleware() gin.HandlerFunc {
 			}
 			c.Set("base_url", fmt.Sprintf("%s://%s", scheme, host))
 		}
-
+		c.Set("host", fmt.Sprintf("%s://%s", scheme, c.Request.Host))
 		// 语言偏好
 		lang := c.GetHeader("Language")
 		if lang == "" {

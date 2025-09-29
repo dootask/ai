@@ -1,11 +1,11 @@
 package knowledgebases
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -821,34 +821,17 @@ func UploadDocument(c *gin.Context) {
 			"chunk_overlap":  strconv.Itoa(kb.ChunkOverlap),
 		}
 
-		// 根据文件类型创建带扩展名的临时文件
-		fileExt := getFileExtension(doc.FileType)
-		tmpFile, err := os.CreateTemp("", "upload_*"+fileExt)
-		if err != nil {
-			// 更新文档状态为处理失败
-			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
-			fmt.Printf("创建临时文件失败: %v\n", err)
-			return
-		}
-		defer os.Remove(tmpFile.Name())
-		defer tmpFile.Close()
-
-		// 写入文件内容
-		if _, err := tmpFile.Write(file); err != nil {
-			// 更新文档状态为处理失败
-			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
-			fmt.Printf("写入临时文件失败: %v\n", err)
-			return
-		}
-
+		fmt.Printf("%v", doc.ID)
+		reader := bytes.NewReader(file)
 		// 上传到AI服务
-		response, err := httpClient.UploadFile(
+		response, err := httpClient.UploadFileWithReader(
 			context.Background(),
 			"/documents/upload",
 			nil,
 			nil,
 			"POST",
-			tmpFile.Name(),
+			reader,
+			fileName,
 			"files",
 			additionalParams,
 		)

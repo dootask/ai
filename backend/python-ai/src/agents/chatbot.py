@@ -19,22 +19,7 @@ async def chatbot(
     config: RunnableConfig,
 ):
     messages = inputs["messages"]
-    print( previous["messages"])
-    if isinstance(messages[0].content, str) and  messages[0].content.startswith("![]("):
-        url = re.findall(r'\((.*?)\)', messages[0].content)[0]
-        img_message=[HumanMessage(content=[{
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"{url}"
-                    }
-                }])]
-        if previous:
-            msg = previous["messages"] + img_message
-        else:
-            msg = img_message
-        return entrypoint.final(
-            value={"messages": ""}, save={"messages": msg}
-        )
+
     configurable = config.get("configurable",{})
     model = get_model_by_provider(
         configurable.get("provider"),
@@ -49,6 +34,32 @@ async def chatbot(
         agent_config = json.loads(configurable.get("agent_config")) if configurable.get("agent_config") else {}
         messages = [SystemMessage(content=agent_config.get("prompt",""))] + messages
 
+    
+    if isinstance(inputs["messages"][0].content, str) and "![](" in inputs["messages"][0].content:
+        # 提取所有图片URL
+        urls = re.findall(r'!\[\]\((.*?)\)', inputs["messages"][0].content)
+        
+        # 移除所有图片标记，获取纯文本
+        text_content = re.sub(r'!\[\]\(.*?\)', '', inputs["messages"][0].content).strip()
+        
+        content_list = []
+        
+        # 添加所有图片
+        for url in urls:
+            content_list.append({
+                "type": "image_url",
+                "image_url": {"url": url}
+            })
+        
+        # 添加文本（如果有的话）
+        if text_content:
+            content_list.append({
+                "type": "text",
+                "text": text_content
+            })
+        
+        img_message = [HumanMessage(content=content_list)]
+        messages = messages + img_message
 
     response = await llm.ainvoke(messages)
     # print(response)
