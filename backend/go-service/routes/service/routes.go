@@ -14,6 +14,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"strings"
@@ -559,6 +560,8 @@ func (h *Handler) buildUserMessage(req WebhookRequest) (string, error) {
 
 		// 使用辅助函数提取文本消息
 		text = extractTextFromMessages(messageList)
+		decodedText, _ := url.QueryUnescape(text)
+		text = strings.ReplaceAll(decodedText, "{{RemoteURL}}", fmt.Sprintf("%v/", req.Extras["base_url"]))
 	} else {
 		text = strings.ReplaceAll(req.Text, "{{RemoteURL}}", fmt.Sprintf("%v/", req.Extras["base_url"]))
 
