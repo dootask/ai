@@ -2,6 +2,7 @@ import json
 import re
 import tempfile
 import time
+from io import BytesIO
 from typing import Any
 
 import httpx
@@ -50,7 +51,7 @@ async def chatbot(
         agent_config = parse_agent_config(configurable.get("agent_config"))
         messages = [SystemMessage(content=agent_config.get("prompt",""))] + messages
 
-    print(messages)
+
     if isinstance(inputs["messages"][0].content, str):
         original_text = inputs["messages"][0].content
 
@@ -97,18 +98,15 @@ async def chatbot(
                         data = resp.content
                         # 尝试从 URL 获取文件名
                         filename = url.split('/')[-1].split('?')[0]
-                        spool = tempfile.SpooledTemporaryFile()
-                        spool.write(data)
-                        spool.seek(0)
-                        upload = UploadFile(file=spool, filename=filename)
+                        upload = UploadFile(file=BytesIO(data), filename=filename)
                         docs = await doc_service.load_document(upload, knowledge_base)
                         if docs:
                             # 拼接文档内容
                             joined = "\n\n".join([d.page_content for d in docs if getattr(d, 'page_content', '')])
                             if joined:
                                 parsed_texts.append(f"[来自文件 {filename} 的内容]\n" + joined)
-                    except Exception:
-                        # 忽略单个文件的错误，继续处理其他文件
+                    except Exception as e:
+                        print(e)
                         continue
 
         # 纯文本（移除图片与文件链接标记）
@@ -129,8 +127,8 @@ async def chatbot(
 
         if content_list:
             messages = messages + [HumanMessage(content=content_list)]
-    print(messages)
-    return None
+
+
     response = await llm.ainvoke(messages)
 
     return entrypoint.final(
