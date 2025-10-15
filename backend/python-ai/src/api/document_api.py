@@ -1,13 +1,13 @@
 import logging
 
-from api import encrypt, verify_bearer, is_from_swagger
-from fastapi import (APIRouter, Depends, File, Form, HTTPException, Query, Request,
-                     UploadFile)
+from api import encrypt, is_from_swagger, valid_content_length, verify_bearer
+from fastapi import (APIRouter, Depends, File, Form, HTTPException, Query,
+                     Request, UploadFile)
+from schema import DeleteResponse, KnowledgeBaseResponse, UploadResponse
 from service.document_service import DocumentService
-from schema import UploadResponse, KnowledgeBaseResponse, DeleteResponse
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/documents", dependencies=[Depends(verify_bearer)],tags=["documents"])
+router = APIRouter(prefix="/documents", dependencies=[Depends(verify_bearer),Depends(valid_content_length)],tags=["documents"])
 
 
 

@@ -12,9 +12,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -558,10 +558,72 @@ func (h *Handler) buildUserMessage(req WebhookRequest) (string, error) {
 			fmt.Println("获取消息列表失败:", err)
 		}
 
-		// 使用辅助函数提取文本消息
-		text = extractTextFromMessages(messageList)
-		decodedText, _ := url.QueryUnescape(text)
-		text = strings.ReplaceAll(decodedText, "{{RemoteURL}}", fmt.Sprintf("%v/", req.Extras["base_url"]))
+		// 拼接所有文本，仅对最新一条进行特殊处理（标签转换）
+		var builder strings.Builder
+
+		if messageBytes, err := json.Marshal(messageList); err == nil {
+			var listContainer struct {
+				List []any `json:"List"`
+			}
+			if err := json.Unmarshal(messageBytes, &listContainer); err == nil {
+				// 反转后按新->旧
+				slices.Reverse(listContainer.List)
+				listLength := len(listContainer.List)
+				pattern := `!\[.*?\]\(.*?\)`
+				re := regexp.MustCompile(pattern)
+				for i, message := range listContainer.List {
+					if dooTaskMsg, err := parseMessageFromAny(message); err == nil {
+						var msgText string
+						var reply string = ""
+						isLatestHandled := (i == listLength-1) || (i == listLength-2)
+						// 仅对最新一条执行标签转换
+						if isLatestHandled {
+							if dooTaskMsg.ReplyId > 0 {
+								if dooTaskMsg.Msg.Reply != nil && dooTaskMsg.Msg.Reply.MsgType == "file" {
+									decodedText, _ := url.QueryUnescape(fmt.Sprintf("![%s](%s) ", dooTaskMsg.Msg.Reply.Msg["name"], dooTaskMsg.Msg.Reply.Msg["url"]))
+									reply = strings.ReplaceAll(decodedText, "{{RemoteURL}}", fmt.Sprintf("%v/", req.Extras["base_url"]))
+								} else if strings.Contains(fmt.Sprint(dooTaskMsg.Msg.Reply.Msg["text"]), "<p><img") {
+									reply, _ = utils.HTMLToMarkdown(fmt.Sprint(dooTaskMsg.Msg.Reply.Msg["text"]))
+								}
+							}
+
+							if md, err := utils.HTMLToMarkdown(dooTaskMsg.ExtractText()); err == nil {
+								msgText = reply + md
+							}
+
+							if re.MatchString(msgText) {
+								decodedText, _ := url.QueryUnescape(msgText)
+								msgText = strings.ReplaceAll(decodedText, "{{RemoteURL}}", fmt.Sprintf("%v/", req.Extras["base_url"]))
+							}
+							isLatestHandled = false
+						} else {
+							// 提取文本并转为 Markdown（如需）
+							if dooTaskMsg.Msg.Type != nil && *dooTaskMsg.Msg.Type == "md" {
+								msgText = dooTaskMsg.ExtractText()
+							} else {
+								if md, err := utils.HTMLToMarkdown(dooTaskMsg.ExtractText()); err == nil {
+									msgText = md
+								} else {
+									fmt.Println("转换HTML为Markdown失败:", err)
+									msgText = dooTaskMsg.ExtractText()
+								}
+							}
+
+							if re.MatchString(msgText) {
+								cleanText := re.ReplaceAllString(msgText, "")
+								msgText = cleanText
+							}
+						}
+
+						builder.WriteString(fmt.Sprintf("%s\n\n", msgText))
+					} else {
+						fmt.Println("消息解析失败:", err)
+					}
+				}
+			}
+		}
+
+		text = builder.String()
 	} else {
 		text = strings.ReplaceAll(req.Text, "{{RemoteURL}}", fmt.Sprintf("%v/", req.Extras["base_url"]))
 
@@ -577,6 +639,7 @@ func (h *Handler) buildUserMessage(req WebhookRequest) (string, error) {
 				}
 				return false
 			}) {
+
 				convertMessage, err := global.DooTaskClient.Client.ConvertWebhookMessageToAI(dootask.ConvertWebhookMessageRequest{
 					Msg: text,
 				})
@@ -608,45 +671,45 @@ func parseMessageFromAny(message any) (*DooTaskMessage, error) {
 	return &dooTaskMsg, nil
 }
 
-// extractTextFromMessages 从消息列表中提取所有文本内容
-func extractTextFromMessages(messageList any) string {
-	var text strings.Builder
+// // extractTextFromMessages 从消息列表中提取所有文本内容
+// func extractTextFromMessages(messageList any) string {
+// 	var text strings.Builder
 
-	// 尝试解析为包含List字段的结构
-	if messageBytes, err := json.Marshal(messageList); err == nil {
-		var listContainer struct {
-			List []any `json:"List"`
-		}
+// 	// 尝试解析为包含List字段的结构
+// 	if messageBytes, err := json.Marshal(messageList); err == nil {
+// 		var listContainer struct {
+// 			List []any `json:"List"`
+// 		}
 
-		if err := json.Unmarshal(messageBytes, &listContainer); err == nil {
-			// slices反转
-			slices.Reverse(listContainer.List)
-			for _, message := range listContainer.List {
-				if dooTaskMsg, err := parseMessageFromAny(message); err == nil {
-					switch dooTaskMsg.Type {
-					case "text":
-						if dooTaskMsg.Msg.Type != nil {
-							if *dooTaskMsg.Msg.Type == "md" {
-								text.WriteString(fmt.Sprintf("%s\n\n", dooTaskMsg.ExtractText()))
-							} else {
-								md, err := utils.HTMLToMarkdown(dooTaskMsg.ExtractText())
-								if err != nil {
-									fmt.Println("转换HTML为Markdown失败:", err)
-								}
-								text.WriteString(fmt.Sprintf("%s\n\n", md))
-							}
-						} else {
-							md, err := utils.HTMLToMarkdown(dooTaskMsg.ExtractText())
-							if err != nil {
-								log.Fatal(err)
-							}
-							text.WriteString(fmt.Sprintf("%s\n\n", md))
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return text.String()
-}
+// 		if err := json.Unmarshal(messageBytes, &listContainer); err == nil {
+// 			// slices反转
+// 			slices.Reverse(listContainer.List)
+// 			for _, message := range listContainer.List {
+// 				if dooTaskMsg, err := parseMessageFromAny(message); err == nil {
+// 					switch dooTaskMsg.Type {
+// 					case "text":
+// 						if dooTaskMsg.Msg.Type != nil {
+// 							if *dooTaskMsg.Msg.Type == "md" {
+// 								text.WriteString(fmt.Sprintf("%s\n\n", dooTaskMsg.ExtractText()))
+// 							} else {
+// 								md, err := utils.HTMLToMarkdown(dooTaskMsg.ExtractText())
+// 								if err != nil {
+// 									fmt.Println("转换HTML为Markdown失败:", err)
+// 								}
+// 								text.WriteString(fmt.Sprintf("%s\n\n", md))
+// 							}
+// 						} else {
+// 							md, err := utils.HTMLToMarkdown(dooTaskMsg.ExtractText())
+// 							if err != nil {
+// 								log.Fatal(err)
+// 							}
+// 							text.WriteString(fmt.Sprintf("%s\n\n", md))
+// 						}
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// 	fmt.Printf("text: %s\n", text.String())
+// 	return text.String()
+// }

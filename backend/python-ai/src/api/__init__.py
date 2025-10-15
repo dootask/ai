@@ -4,9 +4,12 @@ from typing import Annotated
 from core import settings
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+
+async def valid_content_length(content_length: int = Header(..., lt=50_000_000)):
+    return content_length
 
 async def verify_bearer(
     http_auth: Annotated[
