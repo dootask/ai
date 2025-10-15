@@ -8,6 +8,7 @@ import warnings
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+import nltk
 from agents import get_agent, get_all_agent_info
 from api.chat_api import router as chat_router
 from api.document_api import router as document_router
@@ -20,6 +21,11 @@ from langfuse.callback import CallbackHandler
 from memory import initialize_database, initialize_store
 from schema.schema import ServiceMetadata
 
+# 下载 averaged_perceptron_tagger
+nltk.download('averaged_perceptron_tagger')
+
+# 下载 punkt
+nltk.download('punkt')
 load_dotenv()
 
 warnings.filterwarnings("ignore", category=LangChainBetaWarning)
