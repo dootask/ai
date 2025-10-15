@@ -92,14 +92,23 @@ type StreamToolCall struct {
 
 // DooTaskMessage DooTask消息结构
 type DooTaskMessage struct {
-	Type string                `json:"Type"`
-	Msg  DooTaskMessageContent `json:"Msg"`
+	Type    string                `json:"type"`
+	Msg     DooTaskMessageContent `json:"msg"`
+	ReplyId int64                 `json:"reply_id"`
 }
 
 // DooTaskMessageContent 消息内容
 type DooTaskMessageContent struct {
-	Text string  `json:"Text"`
-	Type *string `json:"Type"`
+	Text  string     `json:"text"`
+	Type  *string    `json:"type"`
+	Reply *ReplyData `json:"reply_data"`
+}
+
+type ReplyData struct {
+	ID      int            `json:"id"`
+	Msg     map[string]any `json:"msg"`
+	MsgType string         `json:"type"`
+	UserID  int            `json:"userid"`
 }
 
 // MessageExtractor 消息提取器接口
