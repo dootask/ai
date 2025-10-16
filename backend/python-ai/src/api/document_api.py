@@ -39,15 +39,15 @@ async def upload_documents(
         raise HTTPException(status_code=400, detail="没有提供文件")
     
     # 检查文件类型
-    supported_extensions = {".pdf", ".txt", ".md", ".doc", ".docx"}
-    for file in files:
-        if file.filename:
-            file_extension = file.filename.split(".")[-1].lower()
-            if f".{file_extension}" not in supported_extensions:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"不支持的文件类型: {file_extension}。支持的类型: {', '.join(supported_extensions)}"
-                )
+    # supported_extensions = {".pdf", ".txt", ".md", ".doc", ".docx"}
+    # for file in files:
+    #     if file.filename:
+    #         file_extension = file.filename.split(".")[-1].lower()
+    #         if f".{file_extension}" not in supported_extensions:
+    #             raise HTTPException(
+    #                 status_code=400,
+    #                 detail=f"不支持的文件类型: {file_extension}。支持的类型: {', '.join(supported_extensions)}"
+    #             )
     
     if is_from_swagger(request.headers.get("referer", "")):
         api_key = encrypt(api_key)

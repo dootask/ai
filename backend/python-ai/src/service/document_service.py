@@ -1,12 +1,14 @@
 import json
 import os
 import tempfile
+import time
 from uuid import uuid4
 
 from core import get_embeddings_by_provider, settings
 from fastapi import HTTPException, UploadFile
 from langchain_community.document_loaders import (
-    PyPDFLoader, TextLoader, UnstructuredWordDocumentLoader)
+    CSVLoader, PyMuPDFLoader, PyPDFLoader, TextLoader, UnstructuredExcelLoader,
+    UnstructuredWordDocumentLoader)
 from langchain_core.documents import Document
 from langchain_postgres import PGVector
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -68,14 +70,17 @@ class DocumentService:
         try:
             # 根据文件类型选择加载器
             file_extension = os.path.splitext(file.filename or "")[1].lower()
-            
+            st = time.time()
             if file_extension == ".pdf":
-                loader = PyPDFLoader(tmp_file_path)
-            elif file_extension in [".txt", ".md"]:
-                loader = TextLoader(tmp_file_path, encoding="utf-8")
+                loader = PyMuPDFLoader(file_path=tmp_file_path,mode="single",extract_tables="markdown")
+            elif file_extension in [".txt", ".md", ".json"]:
+                loader = TextLoader(file_path=tmp_file_path, encoding="utf-8")
             elif file_extension in [".doc", ".docx"]:
-                loader = UnstructuredWordDocumentLoader(tmp_file_path)
-                
+                loader  = UnstructuredWordDocumentLoader(file_path=tmp_file_path)
+            elif file_extension in [".csv"]:
+                loader = CSVLoader(file_path=tmp_file_path)
+            elif file_extension in [".xls", ".xlsx"]:
+                loader = UnstructuredExcelLoader(file_path=tmp_file_path,mode="single")
             else:
                 raise HTTPException(
                     status_code=400,

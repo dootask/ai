@@ -65,14 +65,14 @@ async def chatbot(
 
         # 按后缀区分为图片或文件
         image_ext = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'}
-        supported_ext = {'.pdf', '.txt', '.md', '.doc', '.docx'}
+
         def get_ext(url: str) -> str:
             path = url.split('?', 1)[0].split('#', 1)[0]
             idx = path.rfind('.')
             return path[idx:].lower() if idx != -1 else ''
 
         image_urls = [u for u in candidate_urls if get_ext(u) in image_ext]
-        file_urls = [u for u in candidate_urls if get_ext(u) in supported_ext and u not in set(image_urls)]
+        file_urls = [u for u in candidate_urls if  u not in set(image_urls)]
 
         # 构造图片消息内容
         content_list = []
@@ -128,7 +128,7 @@ async def chatbot(
         if content_list:
             messages = messages + [HumanMessage(content=content_list)]
 
-
+    print(messages)
     response = await llm.ainvoke(messages)
 
     return entrypoint.final(
