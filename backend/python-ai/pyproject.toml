@@ -46,7 +46,7 @@ dependencies = [
 
     "pydantic ~=2.10.1",
     "pydantic-settings ~=2.6.1",
-    "pypdf ~=5.3.0",
+    "pymupdf",
     "pyowm ~=3.3.0",
     "python-dotenv ~=1.0.1",
     "setuptools ~=75.6.0",
@@ -62,7 +62,7 @@ dependencies = [
     "langchain-qwq",
     "pycryptodome",
     "unstructured[docx]",
-    
+    "unstructured[xlsx]"
 ]
 
 [dependency-groups]

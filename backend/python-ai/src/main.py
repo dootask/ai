@@ -21,21 +21,28 @@ from langfuse.callback import CallbackHandler
 from memory import initialize_database, initialize_store
 from schema.schema import ServiceMetadata
 
-# 下载 averaged_perceptron_tagger
-nltk.download('averaged_perceptron_tagger')
-
-# 下载 punkt
-nltk.download('punkt')
 load_dotenv()
 
 warnings.filterwarnings("ignore", category=LangChainBetaWarning)
 logger = logging.getLogger(__name__)
+
+def ensure_nltk_resource(resource_path, download_name=None):
+    try:
+        nltk.data.find(resource_path)
+        print(f"✔ 已存在: {resource_path}")
+    except LookupError:
+        print(f"⬇ 未找到 {resource_path}, 正在下载...")
+        nltk.download(download_name or resource_path.split('/')[-1])
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     应用程序生命周期管理，初始化数据库检查点和存储
     """
+    # 检查并下载必要资源
+    ensure_nltk_resource('taggers/averaged_perceptron_tagger', 'averaged_perceptron_tagger')
+    ensure_nltk_resource('tokenizers/punkt', 'punkt')
     try:
         if settings.LANGFUSE_PUBLIC_KEY and settings.LANGFUSE_SECRET_KEY:
             langfuse_handler = CallbackHandler(settings.LANGFUSE_PUBLIC_KEY.get_secret_value(),settings.LANGFUSE_SECRET_KEY.get_secret_value(),settings.LANGFUSE_HOST)
