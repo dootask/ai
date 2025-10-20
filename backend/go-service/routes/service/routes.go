@@ -190,7 +190,7 @@ func (h *Handler) Stream(c *gin.Context) {
 
 	// 检查请求是否正在处理
 	streamKey := fmt.Sprintf("stream_processing:%s", streamId)
-	isNewRequest, err := global.Redis.SetNX(context.Background(), streamKey, 1, 10*time.Minute).Result()
+	isNewRequest, err := global.Redis.SetNX(context.Background(), streamKey, 1, 3*time.Minute).Result()
 	if err != nil {
 		c.String(http.StatusOK, "id: %d\nevent: %s\ndata: {\"error\": \"%s\"}\n\n", 0, "done", "检查流状态失败")
 		return
@@ -205,7 +205,7 @@ func (h *Handler) Stream(c *gin.Context) {
 	// 是新请求，启动goroutine请求AI并将结果存入Redis
 	go func() {
 		// 在goroutine结束时删除处理标记
-		defer global.Redis.Del(context.Background(), streamKey)
+		// defer global.Redis.Del(context.Background(), streamKey)
 
 		cache, err := global.Redis.Get(context.Background(), fmt.Sprintf("stream:%s", streamId)).Result()
 		if err != nil {
@@ -250,8 +250,12 @@ func (h *Handler) Stream(c *gin.Context) {
 
 		if err != nil {
 			errorMsg := fmt.Sprintf(`{"type":"error","content":"%s"}`, err.Error())
-			global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", streamId), errorMsg)
-			global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", streamId), "[DONE]")
+			key := fmt.Sprintf("stream_message:%s", streamId)
+			channel := fmt.Sprintf("stream_message_pub:%s", streamId)
+			global.Redis.LPush(context.Background(), key, errorMsg)
+			global.Redis.Publish(context.Background(), channel, errorMsg)
+			global.Redis.LPush(context.Background(), key, "[DONE]")
+			global.Redis.Publish(context.Background(), channel, "[DONE]")
 			return
 		}
 		defer resp.Body.Close()
@@ -271,7 +275,7 @@ func (h *Handler) Stream(c *gin.Context) {
 	h.streamFromRedis(c)
 }
 
-// streamFromRedis 从Redis读取流式数据并发送到客户端
+// streamFromRedis 从Redis读取流式数据并发送到客户端（支持多个并发订阅者）
 func (h *Handler) streamFromRedis(c *gin.Context) {
 	streamId := c.Param("streamId")
 
@@ -293,8 +297,90 @@ func (h *Handler) streamFromRedis(c *gin.Context) {
 		startTime:           time.Now(),
 	}
 
+	key := fmt.Sprintf("stream_message:%s", streamId)
+	channel := fmt.Sprintf("stream_message_pub:%s", streamId)
+
+	// 读取 backlog（按时间正序回放）
+	backlog, _ := global.Redis.LRange(ctx, key, 0, -1).Result()
+	// LPUSH 导致索引0是最新，这里倒序遍历
+	blIdx := len(backlog) - 1
+
+	// 订阅实时频道
+	pubsub := global.Redis.Subscribe(ctx, channel)
+	msgCh := pubsub.Channel()
+	defer pubsub.Close()
+
+	initialMsg := StreamLineData{
+		Type:    "token",
+		Content: "思考中,请稍候...",
+		IsFirst: true,
+	}
+	idleMsg := StreamLineData{
+		Type:    "token",
+		Content: "正在努力思考中...",
+		IsFirst: true,
+	}
+
+	var initialPingSent int = 0
+	var idleNotified bool
+
 	c.Stream(func(w io.Writer) bool {
-		return h.processStreamMessage(ctx, req, handler, state, w)
+		if initialPingSent == 0 && blIdx < 0 {
+			handler.handleMessage(initialMsg, *req, w, state.startTime, 1, *state)
+			initialPingSent = 1
+			return true
+		}
+		// 优先回放 backlog
+		if blIdx >= 0 {
+			line := backlog[blIdx]
+			blIdx--
+			if line == "[DONE]" {
+				handler.handleDone(*req, w)
+				return false
+			}
+			var v StreamLineData
+			if err := json.Unmarshal([]byte(line), &v); err != nil {
+				return true
+			}
+			h.updateMessageState(&v, state)
+			handler.handleMessage(v, *req, w, state.startTime, 1, *state)
+			return true
+		}
+
+		// backlog 用尽后，进入实时订阅
+		select {
+		case <-ctx.Done():
+			return handler.handleError(w, *req, "流式响应超时")
+		case msg, ok := <-msgCh:
+			if !ok {
+				return handler.handleError(w, *req, "订阅通道已关闭")
+			}
+			line := msg.Payload
+			if line == "[DONE]" {
+				handler.handleDone(*req, w)
+				return false
+			}
+			var v StreamLineData
+			if err := json.Unmarshal([]byte(line), &v); err != nil {
+				return true
+			}
+			if initialPingSent == 1 {
+				initialMsg.Content = ""
+				handler.handleMessage(initialMsg, *req, w, state.startTime, 1, *state)
+				initialPingSent = 2
+			}
+			idleNotified = true
+			h.updateMessageState(&v, state)
+			handler.handleMessage(v, *req, w, state.startTime, 1, *state)
+			return true
+		case <-time.After(RedisReadTimeout):
+			if !idleNotified && time.Since(state.startTime) >= 10*time.Second {
+				handler.handleMessage(idleMsg, *req, w, state.startTime, 1, *state)
+				idleNotified = true
+				return true
+			}
+			return true
+		}
 	})
 }
 
@@ -325,64 +411,6 @@ type StreamState struct {
 	startTime           time.Time
 	ThinkingEnd         bool
 	ThinkingContent     string
-}
-
-// processStreamMessage 处理单个流消息
-func (h *Handler) processStreamMessage(ctx context.Context, req *WebhookRequest, handler *MessageHandler, state *StreamState, w io.Writer) bool {
-	// 检查上下文是否已取消
-	select {
-	case <-ctx.Done():
-		return handler.handleError(w, *req, "流式响应超时")
-	default:
-	}
-
-	// 读取消息
-	line, err := h.readStreamLine(ctx, req.StreamId)
-	if err != nil {
-		if err.Error() == "timeout" {
-			return true // 继续等待
-		}
-		return handler.handleError(w, *req, "获取响应失败")
-	}
-
-	// 处理结束信号
-	if line == "[DONE]" {
-		handler.handleDone(*req, w)
-		return false
-	}
-
-	// 解析并处理消息
-	var v StreamLineData
-	if err := json.Unmarshal([]byte(line), &v); err != nil {
-		if len(line) > 1 {
-			logError("JSON解析失败", err, "line:", line)
-		}
-		return true
-	}
-
-	// 更新消息状态
-	h.updateMessageState(&v, state)
-
-	// 处理消息
-	handler.handleMessage(v, *req, w, state.startTime, 1, *state)
-	return true
-}
-
-// readStreamLine 读取流消息行
-func (h *Handler) readStreamLine(ctx context.Context, streamId string) (string, error) {
-	result, err := global.Redis.BRPop(ctx, RedisReadTimeout, fmt.Sprintf("stream_message:%s", streamId)).Result()
-	if err != nil {
-		if err.Error() == "redis: nil" {
-			return "", fmt.Errorf("timeout")
-		}
-		return "", err
-	}
-
-	line := result[1]
-	if after, ok := strings.CutPrefix(line, "data:"); ok {
-		line = strings.TrimSpace(after)
-	}
-	return line, nil
 }
 
 // updateMessageState 更新消息状态
@@ -670,46 +698,3 @@ func parseMessageFromAny(message any) (*DooTaskMessage, error) {
 
 	return &dooTaskMsg, nil
 }
-
-// // extractTextFromMessages 从消息列表中提取所有文本内容
-// func extractTextFromMessages(messageList any) string {
-// 	var text strings.Builder
-
-// 	// 尝试解析为包含List字段的结构
-// 	if messageBytes, err := json.Marshal(messageList); err == nil {
-// 		var listContainer struct {
-// 			List []any `json:"List"`
-// 		}
-
-// 		if err := json.Unmarshal(messageBytes, &listContainer); err == nil {
-// 			// slices反转
-// 			slices.Reverse(listContainer.List)
-// 			for _, message := range listContainer.List {
-// 				if dooTaskMsg, err := parseMessageFromAny(message); err == nil {
-// 					switch dooTaskMsg.Type {
-// 					case "text":
-// 						if dooTaskMsg.Msg.Type != nil {
-// 							if *dooTaskMsg.Msg.Type == "md" {
-// 								text.WriteString(fmt.Sprintf("%s\n\n", dooTaskMsg.ExtractText()))
-// 							} else {
-// 								md, err := utils.HTMLToMarkdown(dooTaskMsg.ExtractText())
-// 								if err != nil {
-// 									fmt.Println("转换HTML为Markdown失败:", err)
-// 								}
-// 								text.WriteString(fmt.Sprintf("%s\n\n", md))
-// 							}
-// 						} else {
-// 							md, err := utils.HTMLToMarkdown(dooTaskMsg.ExtractText())
-// 							if err != nil {
-// 								log.Fatal(err)
-// 							}
-// 							text.WriteString(fmt.Sprintf("%s\n\n", md))
-// 						}
-// 					}
-// 				}
-// 			}
-// 		}
-// 	}
-// 	fmt.Printf("text: %s\n", text.String())
-// 	return text.String()
-// }

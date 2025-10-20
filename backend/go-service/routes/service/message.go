@@ -262,8 +262,10 @@ func logError(message string, err error, fields ...string) {
 func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.ReadCloser, req WebhookRequest, startTime time.Time) {
 	defer func() {
 		redisKey := fmt.Sprintf("stream_message:%s", req.StreamId)
+		channel := fmt.Sprintf("stream_message_pub:%s", req.StreamId)
 		// 确保写入协程结束时发送结束信号
 		global.Redis.LPush(context.Background(), redisKey, "[DONE]")
+		global.Redis.Publish(context.Background(), channel, "[DONE]")
 		// 设置过期时间，防止客户端未消费导致内存泄漏
 		global.Redis.Expire(context.Background(), redisKey, 10*time.Minute)
 	}()
@@ -286,7 +288,10 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 				Content: combinedContent,
 			}
 			if jsonData, err := json.Marshal(compressedMessage); err == nil {
-				global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", req.StreamId), string(jsonData))
+				key := fmt.Sprintf("stream_message:%s", req.StreamId)
+				channel := fmt.Sprintf("stream_message_pub:%s", req.StreamId)
+				global.Redis.LPush(context.Background(), key, string(jsonData))
+				global.Redis.Publish(context.Background(), channel, string(jsonData))
 			}
 			tokenBuffer = tokenBuffer[:0]
 		}
@@ -376,7 +381,12 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 					}
 				}
 			}
-			global.Redis.LPush(context.Background(), fmt.Sprintf("stream_message:%s", req.StreamId), line)
+			// 在写入非 token/thinking 的消息前，先刷新已缓冲的 token，保证顺序正确
+			compressAndWrite(currentMessageType)
+			key := fmt.Sprintf("stream_message:%s", req.StreamId)
+			channel := fmt.Sprintf("stream_message_pub:%s", req.StreamId)
+			global.Redis.LPush(context.Background(), key, line)
+			global.Redis.Publish(context.Background(), channel, line)
 		}
 	}
 }

@@ -128,7 +128,7 @@ async def chatbot(
         if content_list:
             messages = messages + [HumanMessage(content=content_list)]
 
-    print(messages)
+
     response = await llm.ainvoke(messages)
 
     return entrypoint.final(
