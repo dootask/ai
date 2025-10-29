@@ -190,7 +190,7 @@ func TestDashboard(c *gin.Context) {
 func getAgentStats(c *gin.Context) AgentStats {
 	var stats AgentStats
 
-	user := global.MustGetDooTaskUser(c)
+	user := global.GetDooTaskUser(c)
 	if user == nil {
 		return stats
 	}
@@ -207,7 +207,7 @@ func getAgentStats(c *gin.Context) AgentStats {
 func getConversationStats(c *gin.Context) ConversationStats {
 	var stats ConversationStats
 
-	user := global.MustGetDooTaskUser(c)
+	user := global.GetDooTaskUser(c)
 	if user == nil {
 		return stats
 	}
@@ -225,7 +225,7 @@ func getConversationStats(c *gin.Context) ConversationStats {
 
 // getMessageStats 获取消息统计
 func getMessageStats(c *gin.Context) MessageStats {
-	user := global.MustGetDooTaskUser(c)
+	user := global.GetDooTaskUser(c)
 	var stats MessageStats
 	if user == nil {
 		return stats
@@ -259,7 +259,7 @@ func getMessageStats(c *gin.Context) MessageStats {
 
 // getKnowledgeBaseStats 获取知识库统计
 func getKnowledgeBaseStats(c *gin.Context) KnowledgeBaseStats {
-	user := global.MustGetDooTaskUser(c)
+	user := global.GetDooTaskUser(c)
 	var stats KnowledgeBaseStats
 	if user == nil {
 		return stats
@@ -274,7 +274,7 @@ func getKnowledgeBaseStats(c *gin.Context) KnowledgeBaseStats {
 
 // getMCPToolStats 获取MCP工具统计
 func getMCPToolStats(c *gin.Context) MCPToolStats {
-	user := global.MustGetDooTaskUser(c)
+	user := global.GetDooTaskUser(c)
 	var stats MCPToolStats
 	if user == nil {
 		return stats
@@ -371,7 +371,7 @@ func getRecentAgents(c *gin.Context) []RecentAgent {
 		WHERE a.user_id = ?
 		ORDER BY last_used DESC, a.created_at DESC
 		LIMIT 5
-    `, time.Now().Truncate(24*time.Hour), global.MustGetDooTaskUser(c).UserID).Rows()
+    `, time.Now().Truncate(24*time.Hour), global.GetDooTaskUser(c).UserID).Rows()
 
 	if err != nil {
 		return agents
@@ -412,7 +412,7 @@ func getRecentConversations(c *gin.Context) []RecentConversation {
 		GROUP BY c.id, c.dootask_user_id, a.name
 		ORDER BY last_activity DESC
 		LIMIT 5
-    `, convertor.ToString(global.MustGetDooTaskUser(c).UserID)).Rows()
+    `, convertor.ToString(global.GetDooTaskUser(c).UserID)).Rows()
 
 	if err != nil {
 		return conversations
@@ -432,13 +432,13 @@ func getRecentConversations(c *gin.Context) []RecentConversation {
 		userName := "用户" + userID
 		dialogID, err := strconv.Atoi(dootaskChatID)
 		if err == nil {
-			dialogUsers, err := global.DooTaskClient.Client.GetDialogUser(dootask.GetDialogUserRequest{
+			dialogUsers, err := global.GetDooTaskClient(c).Client.GetDialogUser(dootask.GetDialogUserRequest{
 				DialogID: dialogID,
 				GetUser:  1,
 			})
 			if err == nil {
 				user, ok := slice.FindBy(dialogUsers, func(index int, item dootask.DialogMember) bool {
-					return item.UserID == int(global.MustGetDooTaskUser(c).UserID)
+					return item.UserID == int(global.GetDooTaskUser(c).UserID)
 				})
 				if ok {
 					userName = user.Nickname
