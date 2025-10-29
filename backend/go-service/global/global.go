@@ -2,7 +2,6 @@ package global
 
 import (
 	"dootask-ai/go-service/utils"
-	"errors"
 
 	dootask "github.com/dootask/tools/server/go"
 	"github.com/gin-gonic/gin"
@@ -30,32 +29,34 @@ const (
 )
 
 // GetDooTaskUser 从 gin 上下文中获取用户信息
-func GetDooTaskUser(c *gin.Context) (*dootask.UserInfo, error) {
+func GetDooTaskUser(c *gin.Context) *dootask.UserInfo {
 	if c == nil {
-		return nil, errors.New("context is nil")
+		return nil
 	}
 	if v, ok := c.Get(CtxKeyAuthError); ok && v != nil {
 		if err, ok2 := v.(error); ok2 && err != nil {
-			return nil, err
+			return nil
 		}
 	}
 	v, ok := c.Get(CtxKeyDooTaskUser)
 	if !ok || v == nil {
-		return nil, errors.New("not_authenticated")
+		return nil
 	}
 	user, ok := v.(*dootask.UserInfo)
 	if !ok || user == nil {
-		return nil, errors.New("invalid_user_context")
-	}
-	return user, nil
-}
-
-// MustGetDooTaskUser 获取用户信息，若不存在则直接返回未认证错误
-func MustGetDooTaskUser(c *gin.Context) *dootask.UserInfo {
-	user, err := GetDooTaskUser(c)
-	if err != nil {
-		// 仅返回 nil，由调用方决定如何处理（大多数路由由鉴权中间件保护）
 		return nil
 	}
 	return user
+}
+
+func GetDooTaskClient(c *gin.Context) *utils.DooTaskClient {
+	v, ok := c.Get(CtxKeyDooTaskClient)
+	if !ok || v == nil {
+		return nil
+	}
+	client, ok := v.(*utils.DooTaskClient)
+	if !ok || client == nil {
+		return nil
+	}
+	return client
 }

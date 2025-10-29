@@ -92,7 +92,7 @@ func (h *Handler) GetAIModels(c *gin.Context) {
 	db := global.DB.Model(&AIModel{})
 
 	// 设置默认筛选条件
-	db = db.Where("user_id = ?", global.MustGetDooTaskUser(c).UserID)
+	db = db.Where("user_id = ?", global.GetDooTaskUser(c).UserID)
 
 	// 应用筛选条件
 	if filters.Provider != "" {
@@ -251,7 +251,7 @@ func (h *Handler) CreateAIModel(c *gin.Context) {
 
 	// 检查名称是否已存在
 	var existingModel AIModel
-	if err := global.DB.Where("user_id = ? AND name = ?", global.MustGetDooTaskUser(c).UserID, req.Name).First(&existingModel).Error; err == nil {
+	if err := global.DB.Where("user_id = ? AND name = ?", global.GetDooTaskUser(c).UserID, req.Name).First(&existingModel).Error; err == nil {
 		c.JSON(http.StatusUnprocessableEntity, ErrorResponse{
 			Success: false,
 			Error:   "AI模型名称已存在",
@@ -262,7 +262,7 @@ func (h *Handler) CreateAIModel(c *gin.Context) {
 
 	// 如果设置为默认模型，需要将其他模型的默认状态取消
 	if req.IsDefault {
-		if err := global.DB.Model(&AIModel{}).Where("user_id = ? AND is_default = true", global.MustGetDooTaskUser(c).UserID).Update("is_default", false).Error; err != nil {
+		if err := global.DB.Model(&AIModel{}).Where("user_id = ? AND is_default = true", global.GetDooTaskUser(c).UserID).Update("is_default", false).Error; err != nil {
 			c.JSON(http.StatusUnprocessableEntity, ErrorResponse{
 				Success: false,
 				Error:   "更新默认模型状态失败",
@@ -281,7 +281,7 @@ func (h *Handler) CreateAIModel(c *gin.Context) {
 
 	// 创建模型
 	model := AIModel{
-		UserID:      int64(global.MustGetDooTaskUser(c).UserID),
+		UserID:      int64(global.GetDooTaskUser(c).UserID),
 		Name:        req.Name,
 		Provider:    req.Provider,
 		ModelName:   req.ModelName,
@@ -350,7 +350,7 @@ func (h *Handler) UpdateAIModel(c *gin.Context) {
 
 	// 检查模型是否存在
 	var model AIModel
-	if err := global.DB.Where("user_id = ?", global.MustGetDooTaskUser(c).UserID).First(&model, id).Error; err != nil {
+	if err := global.DB.Where("user_id = ?", global.GetDooTaskUser(c).UserID).First(&model, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusUnprocessableEntity, ErrorResponse{
 				Success: false,
@@ -370,7 +370,7 @@ func (h *Handler) UpdateAIModel(c *gin.Context) {
 	// 检查名称是否冲突（如果更新了名称）
 	if req.Name != nil && *req.Name != model.Name {
 		var existingModel AIModel
-		if err := global.DB.Where("user_id = ? AND name = ? AND id != ?", global.MustGetDooTaskUser(c).UserID, *req.Name, id).First(&existingModel).Error; err == nil {
+		if err := global.DB.Where("user_id = ? AND name = ? AND id != ?", global.GetDooTaskUser(c).UserID, *req.Name, id).First(&existingModel).Error; err == nil {
 			c.JSON(http.StatusUnprocessableEntity, ErrorResponse{
 				Success: false,
 				Error:   "AI模型名称已存在",
@@ -382,7 +382,7 @@ func (h *Handler) UpdateAIModel(c *gin.Context) {
 
 	// 如果设置为默认模型，需要将其他模型的默认状态取消
 	if req.IsDefault != nil && *req.IsDefault {
-		if err := global.DB.Model(&AIModel{}).Where("user_id = ? AND is_default = true AND id != ?", global.MustGetDooTaskUser(c).UserID, id).Update("is_default", false).Error; err != nil {
+		if err := global.DB.Model(&AIModel{}).Where("user_id = ? AND is_default = true AND id != ?", global.GetDooTaskUser(c).UserID, id).Update("is_default", false).Error; err != nil {
 			c.JSON(http.StatusUnprocessableEntity, ErrorResponse{
 				Success: false,
 				Error:   "更新默认模型状态失败",
@@ -479,7 +479,7 @@ func (h *Handler) DeleteAIModel(c *gin.Context) {
 
 	// 检查模型是否存在
 	var model AIModel
-	if err := global.DB.Where("user_id = ?", global.MustGetDooTaskUser(c).UserID).First(&model, id).Error; err != nil {
+	if err := global.DB.Where("user_id = ?", global.GetDooTaskUser(c).UserID).First(&model, id).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusUnprocessableEntity, ErrorResponse{
 				Success: false,
@@ -498,7 +498,7 @@ func (h *Handler) DeleteAIModel(c *gin.Context) {
 
 	// 检查是否有关联的智能体在使用
 	var agentCount int64
-	if err := global.DB.Table("agents").Where("user_id = ? AND ai_model_id = ?", global.MustGetDooTaskUser(c).UserID, id).Count(&agentCount).Error; err != nil {
+	if err := global.DB.Table("agents").Where("user_id = ? AND ai_model_id = ?", global.GetDooTaskUser(c).UserID, id).Count(&agentCount).Error; err != nil {
 		c.JSON(http.StatusUnprocessableEntity, ErrorResponse{
 			Success: false,
 			Error:   "检查关联智能体失败",

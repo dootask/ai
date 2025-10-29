@@ -92,7 +92,7 @@ func ListMCPTools(c *gin.Context) {
 	query := global.DB.Model(&MCPTool{})
 
 	// 设置默认筛选条件
-	query = query.Where("user_id = ? OR category = ?", global.MustGetDooTaskUser(c).UserID, "dootask")
+	query = query.Where("user_id = ? OR category = ?", global.GetDooTaskUser(c).UserID, "dootask")
 
 	// 应用筛选条件
 	if filters.Search != "" {
@@ -138,17 +138,17 @@ func ListMCPTools(c *gin.Context) {
 
 	// 统计工具总数
 	var totalTools int64
-	global.DB.Model(&MCPTool{}).Where("user_id = ?", global.MustGetDooTaskUser(c).UserID).Count(&totalTools)
+	global.DB.Model(&MCPTool{}).Where("user_id = ?", global.GetDooTaskUser(c).UserID).Count(&totalTools)
 
 	// 统计启用工具总数
 	var activeTools int64
-	global.DB.Model(&MCPTool{}).Where("user_id = ? AND is_active = ?", global.MustGetDooTaskUser(c).UserID, true).Count(&activeTools)
+	global.DB.Model(&MCPTool{}).Where("user_id = ? AND is_active = ?", global.GetDooTaskUser(c).UserID, true).Count(&activeTools)
 
 	// 统计对话消息中使用MCP工具的次数
 	var messages []conversations.Message
 	global.DB.Model(&conversations.Conversation{}).Joins(
 		"LEFT JOIN messages ON conversations.id = messages.conversation_id",
-	).Where("conversations.dootask_user_id = ?", strconv.Itoa(int(global.MustGetDooTaskUser(c).UserID))).
+	).Where("conversations.dootask_user_id = ?", strconv.Itoa(int(global.GetDooTaskUser(c).UserID))).
 		Where("messages.mcp_used IS NOT NULL").Select("messages.*").Find(&messages)
 
 	var stats MCPToolStatsResponse
@@ -210,7 +210,7 @@ func CreateMCPTool(c *gin.Context) {
 
 	// 检查工具名称是否已存在
 	var existingTool MCPTool
-	if err := global.DB.Where("user_id = ? AND name = ?", global.MustGetDooTaskUser(c).UserID, req.Name).First(&existingTool).Error; err == nil {
+	if err := global.DB.Where("user_id = ? AND name = ?", global.GetDooTaskUser(c).UserID, req.Name).First(&existingTool).Error; err == nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{
 			"code":    "MCP_TOOL_001",
 			"message": "工具名称已存在",
@@ -228,7 +228,7 @@ func CreateMCPTool(c *gin.Context) {
 
 	// 检查MCP工具标识是否已存在
 	if req.McpName != "" {
-		if err := global.DB.Where("user_id = ? AND mcp_name = ?", global.MustGetDooTaskUser(c).UserID, req.McpName).First(&existingTool).Error; err == nil {
+		if err := global.DB.Where("user_id = ? AND mcp_name = ?", global.GetDooTaskUser(c).UserID, req.McpName).First(&existingTool).Error; err == nil {
 			c.JSON(http.StatusUnprocessableEntity, gin.H{
 				"code":    "MCP_TOOL_003",
 				"message": "MCP工具标识已存在",
@@ -258,7 +258,7 @@ func CreateMCPTool(c *gin.Context) {
 
 	// 创建工具
 	tool := MCPTool{
-		UserID:      int64(global.MustGetDooTaskUser(c).UserID),
+		UserID:      int64(global.GetDooTaskUser(c).UserID),
 		Name:        req.Name,
 		McpName:     req.McpName, // 新增：MCP工具标识
 		Description: req.Description,
@@ -419,7 +419,7 @@ func UpdateMCPTool(c *gin.Context) {
 
 	// 检查工具是否存在
 	var tool MCPTool
-	if err := global.DB.Where("id = ? AND user_id = ?", id, global.MustGetDooTaskUser(c).UserID).First(&tool).Error; err != nil {
+	if err := global.DB.Where("id = ? AND user_id = ?", id, global.GetDooTaskUser(c).UserID).First(&tool).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
 				"code":    "MCP_TOOL_002",
@@ -439,7 +439,7 @@ func UpdateMCPTool(c *gin.Context) {
 	// 检查工具名称是否已被其他工具使用
 	if req.Name != nil && *req.Name != tool.Name {
 		var existingTool MCPTool
-		if err := global.DB.Where("user_id = ? AND name = ? AND id != ?", global.MustGetDooTaskUser(c).UserID, *req.Name, id).First(&existingTool).Error; err == nil {
+		if err := global.DB.Where("user_id = ? AND name = ? AND id != ?", global.GetDooTaskUser(c).UserID, *req.Name, id).First(&existingTool).Error; err == nil {
 			c.JSON(http.StatusUnprocessableEntity, gin.H{
 				"code":    "MCP_TOOL_001",
 				"message": "工具名称已存在",
@@ -459,7 +459,7 @@ func UpdateMCPTool(c *gin.Context) {
 	// 检查MCP工具标识是否已被其他工具使用
 	if req.McpName != nil && *req.McpName != tool.McpName {
 		var existingTool MCPTool
-		if err := global.DB.Where("user_id = ? AND mcp_name = ? AND id != ?", global.MustGetDooTaskUser(c).UserID, *req.McpName, id).First(&existingTool).Error; err == nil {
+		if err := global.DB.Where("user_id = ? AND mcp_name = ? AND id != ?", global.GetDooTaskUser(c).UserID, *req.McpName, id).First(&existingTool).Error; err == nil {
 			c.JSON(http.StatusUnprocessableEntity, gin.H{
 				"code":    "MCP_TOOL_003",
 				"message": "MCP工具标识已存在",
@@ -539,7 +539,7 @@ func DeleteMCPTool(c *gin.Context) {
 
 	// 检查工具是否存在
 	var tool MCPTool
-	if err := global.DB.Where("id = ? AND user_id = ?", id, global.MustGetDooTaskUser(c).UserID).First(&tool).Error; err != nil {
+	if err := global.DB.Where("id = ? AND user_id = ?", id, global.GetDooTaskUser(c).UserID).First(&tool).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
 				"code":    "MCP_TOOL_002",
@@ -619,7 +619,7 @@ func ToggleMCPToolActive(c *gin.Context) {
 
 	// 检查工具是否存在
 	var tool MCPTool
-	if err := global.DB.Where("id = ? AND user_id = ?", id, global.MustGetDooTaskUser(c).UserID).First(&tool).Error; err != nil {
+	if err := global.DB.Where("id = ? AND user_id = ?", id, global.GetDooTaskUser(c).UserID).First(&tool).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
 				"code":    "MCP_TOOL_002",
