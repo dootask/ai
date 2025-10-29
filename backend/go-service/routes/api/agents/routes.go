@@ -99,7 +99,7 @@ func ListAgents(c *gin.Context) {
 	// 检查是否是 /all 路径，如果不是才应用 user_id 筛选
 	if !strings.HasSuffix(c.Request.URL.Path, "/all") {
 		// 设置默认筛选条件
-		query = query.Where("user_id = ?", global.DooTaskUser.UserID)
+		query = query.Where("user_id = ?", global.MustGetDooTaskUser(c).UserID)
 	}
 	// 应用筛选条件
 	if filters.Search != "" {
@@ -170,7 +170,7 @@ func ListAgents(c *gin.Context) {
 		INNER JOIN conversations c ON c.agent_id = a.id AND c.is_active = true
 		INNER JOIN messages m ON m.conversation_id = c.id AND m.response_time_ms > 0
 		WHERE a.user_id = ? AND a.is_active = true
-	`, global.DooTaskUser.UserID).Scan(&averageResponseTime)
+    `, global.MustGetDooTaskUser(c).UserID).Scan(&averageResponseTime)
 
 	// 收集所有需要查询的ID
 	var allKBIDs []int64
@@ -329,7 +329,7 @@ func CreateAgent(c *gin.Context) {
 
 	// 检查智能体名称是否已存在
 	var existingAgent Agent
-	if err := global.DB.Where("user_id = ? AND name = ?", global.DooTaskUser.UserID, req.Name).First(&existingAgent).Error; err == nil {
+	if err := global.DB.Where("user_id = ? AND name = ?", global.MustGetDooTaskUser(c).UserID, req.Name).First(&existingAgent).Error; err == nil {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{
 			"code":    "AGENT_001",
 			"message": "智能体名称已存在",
@@ -357,7 +357,7 @@ func CreateAgent(c *gin.Context) {
 	var modelCount int64
 	if err := global.DB.Model(&struct {
 		ID int64 `gorm:"primaryKey"`
-	}{}).Table("ai_models").Where("id = ? AND user_id = ? AND is_enabled = true", *req.AIModelID, global.DooTaskUser.UserID).Count(&modelCount).Error; err != nil {
+	}{}).Table("ai_models").Where("id = ? AND user_id = ? AND is_enabled = true", *req.AIModelID, global.MustGetDooTaskUser(c).UserID).Count(&modelCount).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    "DATABASE_001",
 			"message": "验证AI模型失败",
@@ -407,7 +407,7 @@ func CreateAgent(c *gin.Context) {
 
 	// 创建智能体
 	agent := Agent{
-		UserID:         int64(global.DooTaskUser.UserID),
+		UserID:         int64(global.MustGetDooTaskUser(c).UserID),
 		Name:           req.Name,
 		Description:    req.Description,
 		Prompt:         req.Prompt,
@@ -566,7 +566,7 @@ func UpdateAgent(c *gin.Context) {
 
 	// 检查智能体是否存在
 	var agent Agent
-	if err := global.DB.Where("id = ? AND user_id = ?", id, global.DooTaskUser.UserID).First(&agent).Error; err != nil {
+	if err := global.DB.Where("id = ? AND user_id = ?", id, global.MustGetDooTaskUser(c).UserID).First(&agent).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
 				"code":    "AGENT_002",
@@ -586,7 +586,7 @@ func UpdateAgent(c *gin.Context) {
 	// 检查智能体名称是否已被其他智能体使用
 	if req.Name != nil && *req.Name != agent.Name {
 		var existingAgent Agent
-		if err := global.DB.Where("user_id = ? AND name = ? AND id != ?", global.DooTaskUser.UserID, *req.Name, id).First(&existingAgent).Error; err == nil {
+		if err := global.DB.Where("user_id = ? AND name = ? AND id != ?", global.MustGetDooTaskUser(c).UserID, *req.Name, id).First(&existingAgent).Error; err == nil {
 			c.JSON(http.StatusUnprocessableEntity, gin.H{
 				"code":    "AGENT_001",
 				"message": "智能体名称已存在",
@@ -615,7 +615,7 @@ func UpdateAgent(c *gin.Context) {
 	var modelCount int64
 	if err := global.DB.Model(&struct {
 		ID int64 `gorm:"primaryKey"`
-	}{}).Table("ai_models").Where("id = ? AND user_id = ? AND is_enabled = true", *req.AIModelID, global.DooTaskUser.UserID).Count(&modelCount).Error; err != nil {
+	}{}).Table("ai_models").Where("id = ? AND user_id = ? AND is_enabled = true", *req.AIModelID, global.MustGetDooTaskUser(c).UserID).Count(&modelCount).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"code":    "DATABASE_001",
 			"message": "验证AI模型失败",
@@ -647,7 +647,7 @@ func UpdateAgent(c *gin.Context) {
 			var knowledgeBaseCount int64
 			if err := global.DB.Model(&struct {
 				ID int64 `gorm:"primaryKey"`
-			}{}).Table("knowledge_bases").Where("id IN (?) AND user_id = ?", kbIDs, global.DooTaskUser.UserID).Count(&knowledgeBaseCount).Error; err != nil {
+			}{}).Table("knowledge_bases").Where("id IN (?) AND user_id = ?", kbIDs, global.MustGetDooTaskUser(c).UserID).Count(&knowledgeBaseCount).Error; err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"code":    "DATABASE_001",
 					"message": "验证知识库失败",
@@ -681,7 +681,7 @@ func UpdateAgent(c *gin.Context) {
 			var toolCount int64
 			if err := global.DB.Model(&struct {
 				ID int64 `gorm:"primaryKey"`
-			}{}).Table("mcp_tools").Where("id IN (?) AND user_id = ?", toolIDs, global.DooTaskUser.UserID).Count(&toolCount).Error; err != nil {
+			}{}).Table("mcp_tools").Where("id IN (?) AND user_id = ?", toolIDs, global.MustGetDooTaskUser(c).UserID).Count(&toolCount).Error; err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"code":    "DATABASE_001",
 					"message": "验证工具失败",
@@ -789,7 +789,7 @@ func DeleteAgent(c *gin.Context) {
 
 	// 检查智能体是否存在
 	var agent Agent
-	if err := global.DB.Where("id = ? AND user_id = ?", id, global.DooTaskUser.UserID).First(&agent).Error; err != nil {
+	if err := global.DB.Where("id = ? AND user_id = ?", id, global.MustGetDooTaskUser(c).UserID).First(&agent).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
 				"code":    "AGENT_002",
@@ -886,7 +886,7 @@ func ToggleAgentActive(c *gin.Context) {
 
 	// 检查智能体是否存在
 	var agent Agent
-	if err := global.DB.Where("id = ? AND user_id = ?", id, global.DooTaskUser.UserID).First(&agent).Error; err != nil {
+	if err := global.DB.Where("id = ? AND user_id = ?", id, global.MustGetDooTaskUser(c).UserID).First(&agent).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
 				"code":    "AGENT_002",
@@ -948,7 +948,7 @@ func SetUserConfig(c *gin.Context) {
 		return
 	}
 
-	userID := int64(global.DooTaskUser.UserID)
+	userID := int64(global.MustGetDooTaskUser(c).UserID)
 	var errors []string
 
 	// 遍历对象中的每个配置项
@@ -1002,12 +1002,12 @@ func GetUserConfig(c *gin.Context) {
 	if key != "" {
 		// 获取指定配置
 		err = global.DB.
-			Where("user_id = ? AND key = ?", global.DooTaskUser.UserID, key).
+			Where("user_id = ? AND key = ?", global.MustGetDooTaskUser(c).UserID, key).
 			Find(&configs).Error
 	} else {
 		// 获取所有配置
 		err = global.DB.
-			Where("user_id = ?", global.DooTaskUser.UserID).
+			Where("user_id = ?", global.MustGetDooTaskUser(c).UserID).
 			Find(&configs).Error
 	}
 

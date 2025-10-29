@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	dootask "github.com/dootask/tools/server/go"
 	"github.com/gin-gonic/gin"
 )
 
@@ -16,12 +17,13 @@ func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 标记为已认证（防止重复认证）
 		if c.GetBool("is_authenticated") {
+			c.Next()
 			return
 		}
 		c.Set("is_authenticated", true)
 
 		// 设置用户信息为空
-		global.DooTaskError = errors.New("not_authenticated")
+		c.Set(global.CtxKeyAuthError, errors.New("not_authenticated"))
 
 		// 从请求头获取token（优先使用环境变量）
 		authToken := utils.GetEnvWithDefault("DOOTASK_API_USER_TOKEN", c.GetHeader("Authorization"))
@@ -31,7 +33,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// 如果token为空，则设置用户信息为空
 		if authToken == "" {
-			global.DooTaskError = errors.New("token is empty")
+			c.Set(global.CtxKeyAuthError, errors.New("token is empty"))
 			c.Next()
 			return
 		}
@@ -40,15 +42,14 @@ func AuthMiddleware() gin.HandlerFunc {
 		client := utils.NewDooTaskClient(authToken)
 		user, err := client.Client.GetUserInfo()
 		if err != nil {
-			global.DooTaskError = err
+			c.Set(global.CtxKeyAuthError, err)
 			c.Next()
 			return
 		}
-
-		// 设置全局变量
-		global.DooTaskClient = &client
-		global.DooTaskUser = user
-		global.DooTaskError = nil
+		// 设置到请求上下文
+		c.Set(global.CtxKeyDooTaskClient, &client)
+		c.Set(global.CtxKeyDooTaskUser, user)
+		c.Set(global.CtxKeyAuthError, nil)
 
 		c.Next()
 	}
@@ -59,16 +60,25 @@ func UserRoleMiddleware(role ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		AuthMiddleware()(c)
 
-		// 如果DooTask错误不为空，则返回401
-		if global.DooTaskError != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": global.DooTaskError.Error()})
-			c.Abort()
-			return
+		// 如果认证错误不为空，则返回401
+		if v, ok := c.Get(global.CtxKeyAuthError); ok && v != nil {
+			if err, ok2 := v.(error); ok2 && err != nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+				c.Abort()
+				return
+			}
 		}
 
 		// 判断用户是否具有指定角色
 		if len(role) > 0 {
-			userHasRole := slices.Contains(global.DooTaskUser.Identity, role[0])
+			v, _ := c.Get(global.CtxKeyDooTaskUser)
+			user, _ := v.(*dootask.UserInfo)
+			if user == nil {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "not_authenticated"})
+				c.Abort()
+				return
+			}
+			userHasRole := slices.Contains(user.Identity, role[0])
 			if !userHasRole {
 				c.JSON(http.StatusForbidden, gin.H{"error": "权限不足"})
 				c.Abort()

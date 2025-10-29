@@ -32,11 +32,11 @@ func RegisterRoutes(router *gin.RouterGroup) {
 // GetDashboardStats 获取仪表板统计数据
 func GetDashboardStats(c *gin.Context) {
 	stats := DashboardStats{
-		Agents:         getAgentStats(),
-		Conversations:  getConversationStats(),
-		Messages:       getMessageStats(),
-		KnowledgeBases: getKnowledgeBaseStats(),
-		MCPTools:       getMCPToolStats(),
+		Agents:         getAgentStats(c),
+		Conversations:  getConversationStats(c),
+		Messages:       getMessageStats(c),
+		KnowledgeBases: getKnowledgeBaseStats(c),
+		MCPTools:       getMCPToolStats(c),
 		SystemStatus:   getSystemStatusInfo(),
 		LastUpdated:    time.Now(),
 	}
@@ -53,8 +53,8 @@ func GetSystemStatus(c *gin.Context) {
 // GetRecentActivity 获取最近活动
 func GetRecentActivity(c *gin.Context) {
 	activity := RecentActivity{
-		RecentAgents:        getRecentAgents(),
-		RecentConversations: getRecentConversations(),
+		RecentAgents:        getRecentAgents(c),
+		RecentConversations: getRecentConversations(c),
 	}
 
 	c.JSON(http.StatusOK, activity)
@@ -187,10 +187,14 @@ func TestDashboard(c *gin.Context) {
 }
 
 // getAgentStats 获取智能体统计
-func getAgentStats() AgentStats {
+func getAgentStats(c *gin.Context) AgentStats {
 	var stats AgentStats
 
-	userID := global.DooTaskUser.UserID
+	user := global.MustGetDooTaskUser(c)
+	if user == nil {
+		return stats
+	}
+	userID := user.UserID
 
 	global.DB.Table("agents").Where("user_id = ?", userID).Count(&stats.Total)
 	global.DB.Table("agents").Where("user_id = ? AND is_active = true", userID).Count(&stats.Active)
@@ -200,10 +204,14 @@ func getAgentStats() AgentStats {
 }
 
 // getConversationStats 获取对话统计
-func getConversationStats() ConversationStats {
+func getConversationStats(c *gin.Context) ConversationStats {
 	var stats ConversationStats
 
-	userID := convertor.ToString(global.DooTaskUser.UserID)
+	user := global.MustGetDooTaskUser(c)
+	if user == nil {
+		return stats
+	}
+	userID := convertor.ToString(user.UserID)
 
 	global.DB.Table("conversations").Where("dootask_user_id = ?", userID).Count(&stats.Total)
 	global.DB.Table("conversations").Where("dootask_user_id = ? AND is_active = true", userID).Count(&stats.Active)
@@ -216,10 +224,13 @@ func getConversationStats() ConversationStats {
 }
 
 // getMessageStats 获取消息统计
-func getMessageStats() MessageStats {
-	userID := convertor.ToString(global.DooTaskUser.UserID)
-
+func getMessageStats(c *gin.Context) MessageStats {
+	user := global.MustGetDooTaskUser(c)
 	var stats MessageStats
+	if user == nil {
+		return stats
+	}
+	userID := convertor.ToString(user.UserID)
 
 	global.DB.Table("messages").Joins(
 		"LEFT JOIN conversations c ON messages.conversation_id = c.id",
@@ -239,7 +250,7 @@ func getMessageStats() MessageStats {
 		INNER JOIN conversations c ON c.agent_id = a.id AND c.is_active = true
 		INNER JOIN messages m ON m.conversation_id = c.id AND m.response_time_ms > 0
 		WHERE a.user_id = ? AND a.is_active = true
-	`, userID).Scan(&averageResponseTime)
+    `, userID).Scan(&averageResponseTime)
 
 	stats.AverageResponseTime = averageResponseTime.Float64 / 1000.0
 
@@ -247,10 +258,13 @@ func getMessageStats() MessageStats {
 }
 
 // getKnowledgeBaseStats 获取知识库统计
-func getKnowledgeBaseStats() KnowledgeBaseStats {
-	userID := global.DooTaskUser.UserID
-
+func getKnowledgeBaseStats(c *gin.Context) KnowledgeBaseStats {
+	user := global.MustGetDooTaskUser(c)
 	var stats KnowledgeBaseStats
+	if user == nil {
+		return stats
+	}
+	userID := user.UserID
 
 	global.DB.Table("knowledge_bases").Where("user_id = ?", userID).Count(&stats.Total)
 	global.DB.Table("kb_documents").Joins("LEFT JOIN knowledge_bases kb ON kb_documents.knowledge_base_id = kb.id").Where("kb.user_id = ?", userID).Count(&stats.DocumentsCount)
@@ -259,10 +273,13 @@ func getKnowledgeBaseStats() KnowledgeBaseStats {
 }
 
 // getMCPToolStats 获取MCP工具统计
-func getMCPToolStats() MCPToolStats {
-	userID := global.DooTaskUser.UserID
-
+func getMCPToolStats(c *gin.Context) MCPToolStats {
+	user := global.MustGetDooTaskUser(c)
 	var stats MCPToolStats
+	if user == nil {
+		return stats
+	}
+	userID := user.UserID
 
 	global.DB.Table("mcp_tools").Where("user_id = ?", userID).Count(&stats.Total)
 	global.DB.Table("mcp_tools").Where("user_id = ? AND is_active = true", userID).Count(&stats.Active)
@@ -330,7 +347,7 @@ func checkDatabaseStatus() ServiceStatus {
 }
 
 // getRecentAgents 获取最近活跃的智能体
-func getRecentAgents() []RecentAgent {
+func getRecentAgents(c *gin.Context) []RecentAgent {
 	var agents []RecentAgent
 
 	rows, err := global.DB.Raw(`
@@ -354,7 +371,7 @@ func getRecentAgents() []RecentAgent {
 		WHERE a.user_id = ?
 		ORDER BY last_used DESC, a.created_at DESC
 		LIMIT 5
-	`, time.Now().Truncate(24*time.Hour), global.DooTaskUser.UserID).Rows()
+    `, time.Now().Truncate(24*time.Hour), global.MustGetDooTaskUser(c).UserID).Rows()
 
 	if err != nil {
 		return agents
@@ -381,7 +398,7 @@ func getRecentAgents() []RecentAgent {
 }
 
 // getRecentConversations 获取最近的对话
-func getRecentConversations() []RecentConversation {
+func getRecentConversations(c *gin.Context) []RecentConversation {
 	var conversations []RecentConversation
 
 	rows, err := global.DB.Raw(`
@@ -395,7 +412,7 @@ func getRecentConversations() []RecentConversation {
 		GROUP BY c.id, c.dootask_user_id, a.name
 		ORDER BY last_activity DESC
 		LIMIT 5
-	`, convertor.ToString(global.DooTaskUser.UserID)).Rows()
+    `, convertor.ToString(global.MustGetDooTaskUser(c).UserID)).Rows()
 
 	if err != nil {
 		return conversations
@@ -421,7 +438,7 @@ func getRecentConversations() []RecentConversation {
 			})
 			if err == nil {
 				user, ok := slice.FindBy(dialogUsers, func(index int, item dootask.DialogMember) bool {
-					return item.UserID == int(global.DooTaskUser.UserID)
+					return item.UserID == int(global.MustGetDooTaskUser(c).UserID)
 				})
 				if ok {
 					userName = user.Nickname

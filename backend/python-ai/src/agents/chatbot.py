@@ -37,7 +37,7 @@ async def chatbot(
     if previous:
         messages = previous["messages"] + messages
     else:
-        agent_config = parse_agent_config(configurable.get("agent_config"))
+        agent_config = json.loads(configurable.get("agent_config", None)) if configurable.get("agent_config", None) else {}
         messages = [SystemMessage(content=agent_config.get("prompt",""))] + messages
 
     response = await llm.ainvoke(messages)
