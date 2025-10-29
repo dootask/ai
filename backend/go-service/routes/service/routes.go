@@ -532,7 +532,9 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 	var dootaskMcp []mcptools.MCPTool
 	var userConfig []agents.UserConfig
 	global.DB.Where("user_id = ? AND is_active = ? AND category = ?", 0, true, "dootask").Find(&dootaskMcp)
-	global.DB.Where("user_id = ? AND key = ? AND value = ?", global.DooTaskUser.UserID, "autoAssignMCP", "0").Find(&userConfig)
+	if req.MsgUser.Userid != 0 {
+		global.DB.Where("user_id = ? AND key = ? AND value = ?", req.MsgUser.Userid, "autoAssignMCP", "0").Find(&userConfig)
+	}
 	// 检查是否使用MCP
 	if agent.Tools != nil {
 		var mcpTools []mcptools.MCPTool

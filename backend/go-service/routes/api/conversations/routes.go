@@ -105,7 +105,7 @@ func ListConversations(c *gin.Context) {
 	if filters.UserID != "" {
 		query = query.Where("conversations.dootask_user_id = ?", filters.UserID)
 	} else {
-		query = query.Where("conversations.dootask_user_id = ?", strconv.Itoa(int(global.DooTaskUser.UserID)))
+		query = query.Where("conversations.dootask_user_id = ?", strconv.Itoa(int(global.MustGetDooTaskUser(c).UserID)))
 	}
 
 	// 日期范围过滤
@@ -138,7 +138,7 @@ func ListConversations(c *gin.Context) {
 	if filters.UserID != "" {
 		countQuery = countQuery.Where("conversations.dootask_user_id = ?", filters.UserID)
 	} else {
-		countQuery = countQuery.Where("conversations.dootask_user_id = ?", strconv.Itoa(int(global.DooTaskUser.UserID)))
+		countQuery = countQuery.Where("conversations.dootask_user_id = ?", strconv.Itoa(int(global.MustGetDooTaskUser(c).UserID)))
 	}
 	if filters.StartDate != nil && *filters.StartDate != "" {
 		if startTime, err := time.Parse("2006-01-02", *filters.StartDate); err == nil {
@@ -193,7 +193,7 @@ func ListConversations(c *gin.Context) {
 			})
 			if err == nil {
 				user, ok := slice.FindBy(dialogUsers, func(index int, item dootask.DialogMember) bool {
-					return item.UserID == int(global.DooTaskUser.UserID)
+					return item.UserID == int(global.MustGetDooTaskUser(c).UserID)
 				})
 				if ok {
 					conversations[i].UserName = user.Nickname
@@ -220,7 +220,7 @@ func ListConversations(c *gin.Context) {
 	}
 
 	// 计算统计信息
-	stats := calculateConversationStatistics(int64(global.DooTaskUser.UserID))
+	stats := calculateConversationStatistics(int64(global.MustGetDooTaskUser(c).UserID))
 
 	// 构造响应数据
 	data := ConversationListData{
@@ -443,7 +443,7 @@ func GetMessages(c *gin.Context) {
 
 // GetConversationStats 获取对话统计信息
 func GetConversationStats(c *gin.Context) {
-	stats := calculateConversationStatistics(int64(global.DooTaskUser.UserID))
+	stats := calculateConversationStatistics(int64(global.MustGetDooTaskUser(c).UserID))
 	c.JSON(http.StatusOK, stats)
 }
 
@@ -476,7 +476,7 @@ func calculateConversationStatistics(userID int64) ConversationStatistics {
 		INNER JOIN conversations c ON c.agent_id = a.id AND c.is_active = true
 		INNER JOIN messages m ON m.conversation_id = c.id AND m.response_time_ms > 0
 		WHERE a.user_id = ? AND a.is_active = true
-	`, global.DooTaskUser.UserID).Scan(&averageResponseTime)
+    `, userID).Scan(&averageResponseTime)
 
 	stats.AverageResponseTime = averageResponseTime.Float64 / 1000.0
 
