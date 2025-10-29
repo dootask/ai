@@ -92,6 +92,28 @@ export const agentsApi = {
     });
     return response.data;
   },
+
+  // 设置用户配置
+  setSettings: async (settings: Record<string, unknown>): Promise<{ message: string }> => {
+    const response = await axiosInstance.post<{ message: string }>('/agents/settings', settings);
+    return response.data;
+  },
+  // 获取用户配置
+  getSettings: async (): Promise<Record<string, unknown>> => {
+    const response = await axiosInstance.get<{
+      message: string;
+      data: Record<string, unknown>[];
+    }>('/agents/settings');
+    
+    // 将数组格式的配置转换为对象格式
+    const configArray = response.data.data;
+    const configObject: Record<string, unknown> = {};
+    
+    configArray.forEach((item: any) => {
+      configObject[item.key] = item.value;
+    });    
+    return configObject;
+  },
 };
 
 // 辅助函数 - 格式化智能体数据（从后端格式转换为前端兼容格式）

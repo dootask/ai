@@ -34,7 +34,7 @@ def build_supervisor(provider: str,model_name: str, agent_config: str):
     base_prompt = (
         "你是一个任务路由中枢。请根据以下规则，将用户请求精准地分配给最合适的代理：\n\n"
         "- **如果**问题明确指向内部知识、公司文档、项目资料或特定产品信息，**则**路由给 `knowledge_base_expert`。\n"
-        "- **对于**所有其他通用问题、需要网络搜索、或需要获取实时数据的请求，**则**路由给 `general_task_expert`。\n\n"
+        "- **对于**所有其他通用问题、需要网络搜索、或需要获取实时数据的请求，**则**路由给 `multi_tool_specialist`。\n\n"
         "你的回答必须且只能是所选代理的名称。"
     )
     model = get_model_by_provider(provider, model_name, agent_config)

@@ -30,6 +30,7 @@ func RegisterRoutes(router *gin.RouterGroup) {
 		mcpToolGroup.POST("/:id/test", TestMCPTool)            // 测试工具
 		mcpToolGroup.GET("/stats", GetMCPToolStats)            // 获取统计信息
 	}
+	InitMCPScheduler()
 }
 
 // ListMCPTools 获取MCP工具列表
@@ -91,7 +92,7 @@ func ListMCPTools(c *gin.Context) {
 	query := global.DB.Model(&MCPTool{})
 
 	// 设置默认筛选条件
-	query = query.Where("user_id = ?", global.DooTaskUser.UserID)
+	query = query.Where("user_id = ? OR category = ?", global.DooTaskUser.UserID, "dootask")
 
 	// 应用筛选条件
 	if filters.Search != "" {

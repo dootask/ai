@@ -111,3 +111,18 @@ type AgentResponse struct {
 func GetAllowedSortFields() []string {
 	return []string{"id", "name", "created_at", "updated_at"}
 }
+
+type UserConfig struct {
+	ID          int64     `gorm:"primaryKey;column:id" json:"id"`
+	UserID      int64     `gorm:"column:user_id;not null" json:"user_id"`
+	Key         string    `gorm:"column:key;type:varchar(255);not null" json:"key"`
+	Value       string    `gorm:"column:value;type:text;not null" json:"value"`
+	Description string    `gorm:"column:description;type:text" json:"description"`
+	CreatedAt   time.Time `gorm:"column:created_at;default:now()" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"column:updated_at;default:now()" json:"updated_at"`
+}
+
+// TableName 指定表名
+func (UserConfig) TableName() string {
+	return "user_configs"
+}

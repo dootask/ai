@@ -5,6 +5,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -14,7 +23,7 @@ import { Switch } from '@/components/ui/switch';
 import { useAppContext } from '@/contexts/app-context';
 import { agentsApi, formatAgentForUI, parseAgentJSONBFields } from '@/lib/api/agents';
 import { Agent, PaginationBase } from '@/lib/types';
-import { Activity, Bot, Edit, Eye, MessageSquare, MoreHorizontal, Plus, Trash2, TrendingUp } from 'lucide-react';
+import { Activity, Bot, Edit, Eye, MessageSquare, MoreHorizontal, Plus, Settings, Trash2, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -24,11 +33,28 @@ export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [pagination, setPagination] = useState<PaginationBase>(defaultPagination);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState({
+    autoAssignMCP: true,
+  });
+
+  const handleSaveSettings = async () => {
+    toast.success('设置已保存');
+    await agentsApi.setSettings(settings);
+    setIsSettingsOpen(false);
+  };
+
 
   // 加载智能体列表
   const loadAgents = useCallback(async () => {
     setIsLoading(true);
     try {
+      const settingsResponse = await agentsApi.getSettings();
+      console.log(settingsResponse);
+      setSettings(prevSettings => ({
+        ...prevSettings,
+        autoAssignMCP: settingsResponse.autoAssignMCP === '0' ? false : true,
+      }));
       const response = await agentsApi.list({
         page: pagination.current_page,
         page_size: pagination.page_size,
@@ -181,7 +207,79 @@ export default function AgentsPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight">智能体管理</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight">智能体管理</h1>
+            <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+              <DialogTrigger asChild>
+                <span
+                  role="button"
+                  aria-label="设置"
+                  className="hover:bg-muted text-muted-foreground inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded"
+                >
+                  <Settings className="h-4 w-4" />
+                </span>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[520px]">
+                <DialogHeader>
+                  <DialogTitle>智能体设置</DialogTitle>
+                  <DialogDescription>配置全局智能体相关的默认行为与偏好。</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium leading-none">自动关联dootask mcp</div>
+                    </div>
+                    <Switch
+                      checked={settings.autoAssignMCP}
+                      onCheckedChange={(v: boolean) => setSettings(s => ({ ...s, autoAssignMCP: v }))}
+                    />
+                  </div>
+{/* 
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <div className="text-sm font-medium leading-none">通知提醒</div>
+                      <p className="text-muted-foreground text-xs">智能体异常或失败时推送提醒。</p>
+                    </div>
+                    <Switch
+                      checked={settings.notifications}
+                      onCheckedChange={(v: boolean) => setSettings(s => ({ ...s, notifications: v }))}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="maxConcurrent">最大并发任务</Label>
+                    <Input
+                      id="maxConcurrent"
+                      type="number"
+                      min={1}
+                      value={settings.maxConcurrent}
+                      onChange={e =>
+                        setSettings(s => ({ ...s, maxConcurrent: Number(e.target.value || 1) }))
+                      }
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="defaultPrefix">默认消息前缀</Label>
+                    <Input
+                      id="defaultPrefix"
+                      placeholder="例如：[#AI]"
+                      value={settings.defaultPrefix}
+                      onChange={e => setSettings(s => ({ ...s, defaultPrefix: e.target.value }))}
+                    />
+                  </div> */}
+                </div>
+
+                <DialogFooter>
+                  <Button variant="secondary" onClick={() => setIsSettingsOpen(false)}>
+                    取消
+                  </Button>
+                  <Button onClick={handleSaveSettings}>保存</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
           <p className="text-muted-foreground">管理和配置 AI 智能体</p>
         </div>
         <Button asChild>
