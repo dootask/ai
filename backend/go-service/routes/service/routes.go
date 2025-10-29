@@ -529,7 +529,10 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 			data["rag_config"] = ragConfig
 		}
 	}
-
+	var dootaskMcp []mcptools.MCPTool
+	var userConfig []agents.UserConfig
+	global.DB.Where("user_id = ? AND is_active = ? AND category = ?", 0, true, "dootask").Find(&dootaskMcp)
+	global.DB.Where("user_id = ? AND key = ? AND value = ?", global.DooTaskUser.UserID, "autoAssignMCP", "0").Find(&userConfig)
 	// 检查是否使用MCP
 	if agent.Tools != nil {
 		var mcpTools []mcptools.MCPTool
@@ -558,8 +561,21 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 				config["transport"] = transport
 				mcpConfig[mcpTool.McpName] = config
 			}
-			data["mcp_config"] = mcpConfig
 		}
+	}
+	if len(dootaskMcp) > 0 && len(userConfig) == 0 {
+		var dootaskConfig map[string]any
+		json.Unmarshal(dootaskMcp[0].Config, &dootaskConfig)
+		dootaskConfig["transport"] = "streamable_http"
+		if headers, ok := dootaskConfig["headers"].(map[string]any); ok {
+			headers["Authorization"] = fmt.Sprintf("Bearer %s", req.MsgUser.Token)
+		} else {
+			dootaskConfig["headers"] = map[string]any{"Authorization": fmt.Sprintf("Bearer %s", req.MsgUser.Token)}
+		}
+		mcpConfig[dootaskMcp[0].McpName] = dootaskConfig
+	}
+	if len(mcpConfig) > 0 {
+		data["mcp_config"] = mcpConfig
 	}
 
 	if isUseTool && isUseRag {

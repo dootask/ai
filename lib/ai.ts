@@ -381,7 +381,7 @@ export const toolCategories = [
   {
     value: 'dootask',
     label: 'DooTask',
-    description: 'DooTask 内部工具',
+    description: 'DooTask 内部工具(全部可见)',
     color: 'bg-blue-100 text-blue-800',
   },
   {

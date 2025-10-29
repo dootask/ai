@@ -33,6 +33,8 @@ func RegisterRoutes(router *gin.RouterGroup) {
 		agentGroup.PUT("/:id", UpdateAgent)                // 更新智能体
 		agentGroup.DELETE("/:id", DeleteAgent)             // 删除智能体
 		agentGroup.PATCH("/:id/toggle", ToggleAgentActive) // 切换智能体状态
+		agentGroup.POST("/settings", SetUserConfig)        // 用户配置
+		agentGroup.GET("/settings", GetUserConfig)         // 获取用户配置
 	}
 }
 
@@ -926,4 +928,110 @@ func ToggleAgentActive(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, updatedAgent)
+}
+
+type ConfigResponse struct {
+	ID          int64     `json:"id"`
+	UserID      int64     `json:"user_id"`
+	Key         string    `json:"key"`
+	Value       string    `json:"value"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+type SettingsMap map[string]interface{}
+
+func SetUserConfig(c *gin.Context) {
+	var req SettingsMap
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "请求参数错误: " + err.Error()})
+		return
+	}
+
+	userID := int64(global.DooTaskUser.UserID)
+	var errors []string
+
+	// 遍历对象中的每个配置项
+	for key, value := range req {
+		// 将值转换为字符串
+		valueStr := fmt.Sprintf("%v", value)
+		if key == "autoAssignMCP" {
+			if valueStr == "true" {
+				valueStr = "1"
+			} else {
+				valueStr = "0"
+			}
+		}
+		config := UserConfig{
+			UserID:      userID,
+			Key:         key,
+			Value:       valueStr,
+			Description: key + " configuration",
+			UpdatedAt:   time.Now(),
+		}
+
+		err := global.DB.
+			Where(UserConfig{UserID: config.UserID, Key: config.Key}).
+			Assign(config).
+			FirstOrCreate(&config).Error
+
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("配置 %s 保存失败: %v", key, err))
+		}
+	}
+
+	if len(errors) > 0 {
+		c.JSON(500, gin.H{
+			"error":   "部分配置保存失败",
+			"details": errors,
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"message": "配置保存成功",
+	})
+}
+
+func GetUserConfig(c *gin.Context) {
+
+	key := c.Query("key")
+	var configs []UserConfig
+	var err error
+
+	if key != "" {
+		// 获取指定配置
+		err = global.DB.
+			Where("user_id = ? AND key = ?", global.DooTaskUser.UserID, key).
+			Find(&configs).Error
+	} else {
+		// 获取所有配置
+		err = global.DB.
+			Where("user_id = ?", global.DooTaskUser.UserID).
+			Find(&configs).Error
+	}
+
+	if err != nil {
+		c.JSON(500, gin.H{"error": "获取配置失败: " + err.Error()})
+		return
+	}
+
+	// 转换为响应格式
+	var response []ConfigResponse
+	for _, config := range configs {
+		response = append(response, ConfigResponse{
+			ID:          config.ID,
+			UserID:      config.UserID,
+			Key:         config.Key,
+			Value:       config.Value,
+			Description: config.Description,
+			CreatedAt:   config.CreatedAt,
+			UpdatedAt:   config.UpdatedAt,
+		})
+	}
+
+	c.JSON(200, gin.H{
+		"message": "获取配置成功",
+		"data":    response,
+	})
 }
