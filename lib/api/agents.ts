@@ -102,18 +102,19 @@ export const agentsApi = {
   getSettings: async (): Promise<Record<string, unknown>> => {
     const response = await axiosInstance.get<{
       message: string;
-      data: Record<string, unknown>[];
+      data: Array<{ key: string; value: unknown }>;
     }>('/agents/settings');
-    
-    // 将数组格式的配置转换为对象格式
-    const configArray = response.data.data;
+  
+    // 1. 告诉 TS “以后随便加 key”
     const configObject: Record<string, unknown> = {};
-    
-    configArray.forEach((item: any) => {
+  
+    // 2.  item 已经带有具体类型，无需 any
+    response.data.data.forEach(item => {
       configObject[item.key] = item.value;
-    });    
+    });
+  
     return configObject;
-  },
+  }
 };
 
 // 辅助函数 - 格式化智能体数据（从后端格式转换为前端兼容格式）
