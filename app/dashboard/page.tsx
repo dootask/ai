@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 import { fetchDashboardStats, fetchRecentActivity, RecentActivity } from '@/lib/api/dashboard';
 import { DashboardStats } from '@/lib/types';
-import { Activity, Bot, Brain, Cpu, Database, Link, MessageSquare, RefreshCcw, Zap } from 'lucide-react';
+import { Activity, Bot, Brain, Cpu, Database, HomeIcon, Link, MessageSquare, RefreshCcw, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function Dashboard() {
@@ -90,7 +90,10 @@ export default function Dashboard() {
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
           <div className="flex flex-col gap-1">
-            <h1 className="text-3xl font-bold tracking-tight">仪表板</h1>
+            <div className="flex items-center gap-2 mb-2">
+              <HomeIcon className="text-primary h-8 w-8" />
+              <h1 className="text-3xl font-bold tracking-tight">仪表板</h1>
+            </div>
             <p className="text-muted-foreground">DooTask AI 智能体管理系统概览</p>
           </div>
         </div>
@@ -115,7 +118,10 @@ export default function Dashboard() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight">仪表板</h1>
+          <div className="flex items-center gap-2 mb-2">
+            <HomeIcon className="text-primary h-8 w-8" />
+            <h1 className="text-3xl font-bold tracking-tight">仪表板</h1>
+          </div>
           <p className="text-muted-foreground">DooTask AI 智能体管理系统概览</p>
         </div>
         <Button onClick={loadData} variant="outline" size="sm">

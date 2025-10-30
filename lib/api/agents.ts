@@ -107,12 +107,12 @@ export const agentsApi = {
   
     // 1. 告诉 TS “以后随便加 key”
     const configObject: Record<string, unknown> = {};
-  
-    // 2.  item 已经带有具体类型，无需 any
-    response.data.data.forEach(item => {
-      configObject[item.key] = item.value;
-    });
-  
+    if (response.data.data) {
+      // 2.  item 已经带有具体类型，无需 any
+      response.data.data.forEach(item => {
+        configObject[item.key] = item.value;
+      });
+    }
     return configObject;
   }
 };

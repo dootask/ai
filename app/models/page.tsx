@@ -197,7 +197,10 @@ export default function ModelsPage() {
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
           <div className="flex flex-col gap-1">
-            <h1 className="text-3xl font-bold tracking-tight">AI 模型管理</h1>
+            <div className="flex items-center gap-2">
+              <Bot className="text-primary h-8 w-8" />
+              <h1 className="text-3xl font-bold tracking-tight">AI 模型管理</h1>
+            </div>
             <p className="text-muted-foreground">管理和配置 AI 模型</p>
           </div>
         </div>

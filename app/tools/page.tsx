@@ -33,6 +33,7 @@ import {
   Trash2,
   TrendingUp,
   Wrench,
+  WrenchIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
@@ -274,7 +275,10 @@ export default function ToolsPage() {
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
           <div className="flex flex-col gap-1">
-            <h1 className="text-3xl font-bold tracking-tight">MCP 工具管理</h1>
+            <div className="flex items-center gap-2 mb-2">
+              <WrenchIcon className="text-primary h-8 w-8" />
+              <h1 className="text-3xl font-bold tracking-tight">MCP 工具管理</h1>
+            </div>
             <p className="text-muted-foreground">管理智能体可使用的 MCP 工具</p>
           </div>
         </div>
@@ -334,7 +338,10 @@ export default function ToolsPage() {
       
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight">MCP 工具管理</h1>
+          <div className="flex items-center gap-2 mb-2">
+            <WrenchIcon className="text-primary h-8 w-8" />
+            <h1 className="text-3xl font-bold tracking-tight">MCP 工具管理</h1>
+          </div>
           <p className="text-muted-foreground">管理智能体可使用的 MCP 工具</p>
         </div>
         <Button asChild>

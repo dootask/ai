@@ -5,11 +5,10 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppProvider } from '@/contexts/app-context';
 import { DootaskProvider } from '@/contexts/dootask-context';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+
 import { headers } from "next/headers";
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: 'DooTask AI 智能体管理',
@@ -25,7 +24,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <meta name="color-scheme" content="light dark" />
       </head>
-      <body className={inter.className}>
+      <body >
         <AppProvider>
           <DootaskProvider>
             <ProtectedRoute>

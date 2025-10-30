@@ -245,7 +245,7 @@ func (h *Handler) Stream(c *gin.Context) {
 			return
 		}
 		req.Extras["base_url"] = c.GetString("host")
-		fmt.Printf("--------->%v", global.GetDooTaskUser(c))
+		fmt.Printf("--------->%v", cache)
 		// 请求AI
 		resp, err := h.requestAI(aiModel, agent, req)
 
