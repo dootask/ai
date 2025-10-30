@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	"dootask-ai/go-service/global"
@@ -51,13 +52,13 @@ func InitRedis() error {
 		cancel()
 
 		if err == nil {
-			fmt.Printf("Redis连接成功\n")
+			log.Printf("Redis连接成功")
 			break
 		}
 
 		// 如果不是最后一次尝试，则等待后重试
 		if i < redisMaxRetries-1 {
-			fmt.Printf("Redis连接失败 (尝试 %d/%d)\n", i+1, redisMaxRetries)
+			log.Printf("Redis连接失败 (尝试 %d/%d)", i+1, redisMaxRetries)
 			time.Sleep(redisRetryDelay)
 		}
 	}

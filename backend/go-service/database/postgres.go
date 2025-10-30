@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"log"
 	"time"
 
 	"dootask-ai/go-service/global"
@@ -42,7 +43,7 @@ func InitDatabase() error {
 			if dbErr == nil {
 				pingErr := sqlDB.Ping()
 				if pingErr == nil {
-					fmt.Printf("数据库连接成功\n")
+					log.Printf("数据库连接成功")
 					break
 				}
 				err = pingErr
@@ -52,7 +53,7 @@ func InitDatabase() error {
 		}
 
 		if i < maxRetries-1 {
-			fmt.Printf("数据库连接失败 (尝试 %d/%d)\n", i+1, maxRetries)
+			log.Printf("数据库连接失败 (尝试 %d/%d)", i+1, maxRetries)
 			time.Sleep(retryDelay)
 		}
 	}

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -47,7 +48,7 @@ func (h *MessageHandler) sendSSEResponse(w io.Writer, req WebhookRequest, event 
 	if flusher, ok := w.(http.Flusher); ok {
 		flusher.Flush()
 	} else {
-		fmt.Printf("[WARNING] Writer不支持Flush操作\n")
+		log.Printf("[WARNING] Writer不支持Flush操作\n")
 	}
 }
 
@@ -252,9 +253,9 @@ func (h *MessageHandler) createMessage(createMessage CreateMessage) {
 // logError 统一错误日志格式
 func logError(message string, err error, fields ...string) {
 	if err != nil {
-		fmt.Printf("[ERROR] %s: %v | %s\n", message, err, strings.Join(fields, " | "))
+		log.Printf("[ERROR] %s: %v | %s\n", message, err, strings.Join(fields, " | "))
 	} else {
-		fmt.Printf("[ERROR] %s | %s\n", message, strings.Join(fields, " | "))
+		log.Printf("[ERROR] %s | %s\n", message, strings.Join(fields, " | "))
 	}
 }
 

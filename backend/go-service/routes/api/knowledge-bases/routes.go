@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -821,7 +822,7 @@ func UploadDocument(c *gin.Context) {
 			"chunk_overlap":  strconv.Itoa(kb.ChunkOverlap),
 		}
 
-		fmt.Printf("%v", doc.ID)
+		log.Printf("%v", doc.ID)
 		reader := bytes.NewReader(file)
 		// 上传到AI服务
 		response, err := httpClient.UploadFileWithReader(
@@ -839,14 +840,14 @@ func UploadDocument(c *gin.Context) {
 		if err != nil {
 			// 更新文档状态为处理失败
 			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
-			fmt.Printf("上传文档到AI服务失败: %v, doc_id: %d\n", err, doc.ID)
+			log.Printf("上传文档到AI服务失败: %v, doc_id: %d\n", err, doc.ID)
 			return
 		}
 
 		if response.StatusCode != http.StatusOK {
 			// 更新文档状态为处理失败
 			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
-			fmt.Printf("AI服务返回错误: status=%d, body=%s\n", response.StatusCode, string(response.Body))
+			log.Printf("AI服务返回错误: status=%d, body=%s\n", response.StatusCode, string(response.Body))
 			return
 		}
 
@@ -854,14 +855,14 @@ func UploadDocument(c *gin.Context) {
 		if err := json.Unmarshal(response.Body, &uploadDocumentResponse); err != nil {
 			// 更新文档状态为处理失败
 			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
-			fmt.Printf("解析上传文档响应失败: %v\n", err)
+			log.Printf("解析上传文档响应失败: %v\n", err)
 			return
 		}
 
 		if len(uploadDocumentResponse.ProcessedFiles) == 0 {
 			// 更新文档状态为处理失败
 			global.DB.Model(&KBDocument{}).Where("id = ?", doc.ID).Update("status", "failed")
-			fmt.Printf("上传文档到AI服务失败，没有处理的文件: %v, doc_id: %d\n", uploadDocumentResponse, doc.ID)
+			log.Printf("上传文档到AI服务失败，没有处理的文件: %v, doc_id: %d\n", uploadDocumentResponse, doc.ID)
 			return
 		}
 
