@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"log"
 	"os"
 
 	"dootask-ai/go-service/cmd"
@@ -9,7 +9,7 @@ import (
 
 func main() {
 	if err := cmd.Execute(); err != nil {
-		fmt.Println(err)
+		log.Printf("%v", err)
 		os.Exit(1)
 	}
 }

@@ -6,7 +6,6 @@ import (
 	"dootask-ai/go-service/middleware"
 	"dootask-ai/go-service/routes"
 	"dootask-ai/go-service/utils"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -39,21 +38,21 @@ func runPre(*cobra.Command, []string) {
 	// 加载主环境变量文件
 	if global.EnvFile != "" && utils.IsFileExists(global.EnvFile) {
 		if err := godotenv.Load(global.EnvFile); err != nil {
-			fmt.Printf("加载环境变量失败: %v\n", err)
+			log.Printf("加载环境变量失败: %v", err)
 			os.Exit(1)
 		}
-		fmt.Printf("环境变量文件: %s\n", global.EnvFile)
+		log.Printf("环境变量文件: %s", global.EnvFile)
 	}
 
 	// 初始化数据库
 	if err := database.InitDatabase(); err != nil {
-		fmt.Printf("初始化数据库失败: %v\n", err)
+		log.Printf("初始化数据库失败: %v", err)
 		os.Exit(1)
 	}
 
 	// 初始化Redis
 	if err := database.InitRedis(); err != nil {
-		fmt.Printf("初始化Redis失败: %v\n", err)
+		log.Printf("初始化Redis失败: %v", err)
 		os.Exit(1)
 	}
 }

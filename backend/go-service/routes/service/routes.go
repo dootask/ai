@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -62,6 +63,31 @@ func (h *Handler) Webhook(c *gin.Context) {
 			"data":    err.Error(),
 		})
 		return
+	}
+	if err := c.Request.ParseForm(); err == nil {
+		form := c.Request.PostForm
+		msgUser := WebhookMsgUser{}
+
+		// 解析msg_user相关字段
+		if userid, err := strconv.ParseInt(form.Get("msg_user[userid]"), 10, 64); err == nil {
+			msgUser.Userid = userid
+		}
+		msgUser.Email = form.Get("msg_user[email]")
+		msgUser.Nickname = form.Get("msg_user[nickname]")
+		msgUser.Profession = form.Get("msg_user[profession]")
+		msgUser.Lang = form.Get("msg_user[lang]")
+		msgUser.Token = form.Get("msg_user[token]")
+
+		req.MsgUser = msgUser
+
+		// 3. 解析extras字段
+		extrasStr := form.Get("extras")
+		if extrasStr != "" {
+			var extras map[string]any
+			if err := json.Unmarshal([]byte(extrasStr), &extras); err == nil {
+				req.Extras = extras
+			}
+		}
 	}
 
 	// 群聊且没有@机器人，不处理
@@ -119,7 +145,7 @@ func (h *Handler) Webhook(c *gin.Context) {
 	// 获取消息 map 转 json
 	webhookResponse, err := h.parseWebhookResponse(response)
 	if err != nil {
-		fmt.Println("解析响应数据失败:", err)
+		log.Printf("解析响应数据失败: %v", err)
 		return
 	}
 
@@ -136,11 +162,11 @@ func (h *Handler) Webhook(c *gin.Context) {
 				IsActive:      true,
 			}
 			if err := global.DB.Create(&conversation).Error; err != nil {
-				fmt.Println("创建对话失败:", err)
+				log.Printf("创建对话失败: %v", err)
 				return
 			}
 		} else {
-			fmt.Println("查询对话失败:", err)
+			log.Printf("查询对话失败: %v", err)
 			return
 		}
 	}
@@ -152,7 +178,7 @@ func (h *Handler) Webhook(c *gin.Context) {
 	// 使用rune处理Unicode字符，确保正确截取多字节字符
 	text, err := h.buildUserMessage(req)
 	if err != nil {
-		fmt.Println("构建用户消息失败:", err)
+		log.Printf("构建用户消息失败: %v", err)
 		return
 	}
 	runes := []rune(text)
@@ -167,7 +193,7 @@ func (h *Handler) Webhook(c *gin.Context) {
 		Content:        text,
 	}
 	if err := global.DB.Create(&message).Error; err != nil {
-		fmt.Println("创建消息失败:", err)
+		log.Printf("创建消息失败: %v", err)
 		return
 	}
 }
@@ -245,7 +271,7 @@ func (h *Handler) Stream(c *gin.Context) {
 			return
 		}
 		req.Extras["base_url"] = c.GetString("host")
-		fmt.Printf("--------->%v", cache)
+
 		// 请求AI
 		resp, err := h.requestAI(aiModel, agent, req)
 
@@ -443,13 +469,13 @@ func (h *Handler) updateMessageState(v *StreamLineData, state *StreamState) {
 func (h *Handler) parseWebhookResponse(response map[string]any) (*WebhookResponse, error) {
 	responseJson, err := json.Marshal(response)
 	if err != nil {
-		fmt.Println("解析响应数据失败:", err)
+		log.Printf("解析响应数据失败: %v", err)
 		return nil, err
 	}
 
 	var webhookResponse WebhookResponse
 	if err := json.Unmarshal(responseJson, &webhookResponse); err != nil {
-		fmt.Println("解析响应数据失败:", err)
+		log.Printf("解析响应数据失败: %v", err)
 		return nil, err
 	}
 
@@ -486,7 +512,7 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 
 	text, err := h.buildUserMessage(req)
 	if err != nil {
-		fmt.Println("requestAI buildUserMessage error:", err)
+		log.Printf("requestAI buildUserMessage error: %v", err)
 		return nil, err
 	}
 
@@ -608,7 +634,7 @@ func (h *Handler) buildUserMessage(req WebhookRequest) (string, error) {
 			Take:     10,
 		})
 		if err != nil {
-			fmt.Println("获取消息列表失败:", err)
+			log.Printf("获取消息列表失败: %v", err)
 		}
 
 		// 拼接所有文本，仅对最新一条进行特殊处理（标签转换）
@@ -657,7 +683,7 @@ func (h *Handler) buildUserMessage(req WebhookRequest) (string, error) {
 								if md, err := utils.HTMLToMarkdown(dooTaskMsg.ExtractText()); err == nil {
 									msgText = md
 								} else {
-									fmt.Println("转换HTML为Markdown失败:", err)
+									log.Printf("转换HTML为Markdown失败: %v", err)
 									msgText = dooTaskMsg.ExtractText()
 								}
 							}
@@ -670,7 +696,7 @@ func (h *Handler) buildUserMessage(req WebhookRequest) (string, error) {
 
 						builder.WriteString(fmt.Sprintf("%s\n\n", msgText))
 					} else {
-						fmt.Println("消息解析失败:", err)
+						log.Printf("消息解析失败: %v", err)
 					}
 				}
 			}
@@ -697,7 +723,7 @@ func (h *Handler) buildUserMessage(req WebhookRequest) (string, error) {
 					Msg: text,
 				})
 				if err != nil {
-					fmt.Println("转换消息失败:", err)
+					log.Printf("转换消息失败: %v", err)
 					return "", err
 				}
 				text = convertMessage.Msg

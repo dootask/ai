@@ -3,6 +3,7 @@ package migrations
 import (
 	"embed"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -74,7 +75,7 @@ func (m *MigrationManager) Migrate() error {
 			continue
 		}
 
-		fmt.Printf("执行迁移: %s - %s\n", migration.Version, migration.Name)
+		log.Printf("执行迁移: %s - %s\n", migration.Version, migration.Name)
 
 		// 开始事务
 		tx := m.db.Begin()
@@ -123,7 +124,7 @@ func (m *MigrationManager) Migrate() error {
 				return fmt.Errorf("提交迁移 %s 失败: %v", migration.Version, err)
 			}
 
-			fmt.Printf("迁移 %s 执行成功\n", migration.Version)
+			log.Printf("迁移 %s 执行成功\n", migration.Version)
 		} else {
 			// 回滚事务（注意：DDL语句无法回滚，但可以回滚迁移记录）
 			tx.Rollback()
@@ -218,16 +219,16 @@ func (m *MigrationManager) Status() error {
 		executedVersions[migration.Version] = migration
 	}
 
-	fmt.Println("迁移状态:")
-	fmt.Println("版本号\t\t状态\t\t名称")
-	fmt.Println("------\t\t----\t\t----")
+	log.Printf("迁移状态:")
+	log.Printf("版本号\t\t状态\t\t名称")
+	log.Printf("------\t\t----\t\t----")
 
 	for _, migration := range migrations {
 		status := "待执行"
 		if _, exists := executedVersions[migration.Version]; exists {
 			status = "已执行"
 		}
-		fmt.Printf("%s\t\t%s\t\t%s\n", migration.Version, status, migration.Name)
+		log.Printf("%s\t\t%s\t\t%s\n", migration.Version, status, migration.Name)
 	}
 
 	return nil
@@ -314,10 +315,10 @@ func (m *MigrationManager) validateStatements(tx *gorm.DB, statements []string) 
 // provideDDLRecoveryAdvice 提供DDL恢复建议
 func (m *MigrationManager) provideDDLRecoveryAdvice(version string, statements []string) {
 	// 实现提供恢复建议的逻辑
-	fmt.Printf("迁移 %s 执行失败，已回滚事务\n", version)
-	fmt.Printf("警告：DDL语句可能已部分执行且无法回滚，请手动检查数据库状态\n")
-	fmt.Printf("建议：请检查以下语句是否需要手动恢复\n")
+	log.Printf("迁移 %s 执行失败，已回滚事务\n", version)
+	log.Printf("警告：DDL语句可能已部分执行且无法回滚，请手动检查数据库状态\n")
+	log.Printf("建议：请检查以下语句是否需要手动恢复\n")
 	for _, stmt := range statements {
-		fmt.Printf("  %s\n", stmt)
+		log.Printf("  %s\n", stmt)
 	}
 }

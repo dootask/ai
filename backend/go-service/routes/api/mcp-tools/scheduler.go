@@ -2,8 +2,8 @@ package mcptools
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"time"
 
@@ -44,7 +44,7 @@ func InitMCPScheduler() {
 func checkAndCreateMCPTool() {
 	// 检查健康状态
 	if !checkHealthStatus() {
-		fmt.Printf("MCP服务健康检查失败，跳过创建工具")
+		log.Printf("MCP服务健康检查失败，跳过创建工具")
 		return
 	}
 
@@ -52,10 +52,10 @@ func checkAndCreateMCPTool() {
 	var existingTool MCPTool
 	err := global.DB.Where("mcp_name = ?", AutoMCPToolMcpName).First(&existingTool).Error
 	if err == nil {
-		fmt.Printf("自动MCP工具已存在，ID: %d", existingTool.ID)
+		log.Printf("自动MCP工具已存在，ID: %d", existingTool.ID)
 		return
 	} else if err != gorm.ErrRecordNotFound {
-		fmt.Printf("查询自动MCP工具失败: %v", err)
+		log.Printf("查询自动MCP工具失败: %v", err)
 		return
 	}
 
@@ -65,7 +65,7 @@ func checkAndCreateMCPTool() {
 	}
 	configBytes, err := json.Marshal(config)
 	if err != nil {
-		fmt.Printf("序列化MCP工具配置失败: %v", err)
+		log.Printf("序列化MCP工具配置失败: %v", err)
 		return
 	}
 
@@ -82,11 +82,11 @@ func checkAndCreateMCPTool() {
 	}
 
 	if err := global.DB.Create(&tool).Error; err != nil {
-		fmt.Printf("创建自动MCP工具失败: %v", err)
+		log.Printf("创建自动MCP工具失败: %v", err)
 		return
 	}
 
-	fmt.Printf("自动创建MCP工具成功，ID: %d", tool.ID)
+	log.Printf("自动创建MCP工具成功，ID: %d", tool.ID)
 
 }
 
@@ -98,25 +98,25 @@ func checkHealthStatus() bool {
 
 	resp, err := client.Get(HealthCheckURL)
 	if err != nil {
-		fmt.Printf("健康检查请求失败: %v", err)
+		log.Printf("健康检查请求失败: %v", err)
 		return false
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		fmt.Printf("健康检查返回非200状态码: %d", resp.StatusCode)
+		log.Printf("健康检查返回非200状态码: %d", resp.StatusCode)
 		return false
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("读取健康检查响应失败: %v", err)
+		log.Printf("读取健康检查响应失败: %v", err)
 		return false
 	}
 
 	var healthResp HealthCheckResponse
 	if err := json.Unmarshal(body, &healthResp); err != nil {
-		fmt.Printf("解析健康检查响应失败: %v", err)
+		log.Printf("解析健康检查响应失败: %v", err)
 		return false
 	}
 
