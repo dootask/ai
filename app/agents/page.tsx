@@ -23,7 +23,7 @@ import { Switch } from '@/components/ui/switch';
 import { useAppContext } from '@/contexts/app-context';
 import { agentsApi, formatAgentForUI, parseAgentJSONBFields } from '@/lib/api/agents';
 import { Agent, PaginationBase } from '@/lib/types';
-import { Activity, Bot, Edit, Eye, MessageSquare, MoreHorizontal, Plus, Settings, Trash2, TrendingUp } from 'lucide-react';
+import { Activity, Bot, BotIcon, Edit, Eye, MessageSquare, MoreHorizontal, Plus, Settings, Trash2, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -159,7 +159,10 @@ export default function AgentsPage() {
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
           <div className="flex flex-col gap-1">
-            <h1 className="text-3xl font-bold tracking-tight">智能体管理</h1>
+            <div className="flex items-center gap-2 mb-2">
+              <BotIcon className="text-primary h-8 w-8" />
+              <h1 className="text-3xl font-bold tracking-tight">智能体管理</h1>
+            </div>
             <p className="text-muted-foreground">管理和配置 AI 智能体</p>
           </div>
         </div>
@@ -208,7 +211,10 @@ export default function AgentsPage() {
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">智能体管理</h1>
+            <div className="flex items-center gap-2 mb-2">
+              <BotIcon className="text-primary h-8 w-8" />
+              <h1 className="text-3xl font-bold tracking-tight">智能体管理</h1>
+            </div>
             <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
               <DialogTrigger asChild>
                 <span
@@ -235,40 +241,6 @@ export default function AgentsPage() {
                       onCheckedChange={(v: boolean) => setSettings(s => ({ ...s, autoAssignMCP: v }))}
                     />
                   </div>
-{/* 
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium leading-none">通知提醒</div>
-                      <p className="text-muted-foreground text-xs">智能体异常或失败时推送提醒。</p>
-                    </div>
-                    <Switch
-                      checked={settings.notifications}
-                      onCheckedChange={(v: boolean) => setSettings(s => ({ ...s, notifications: v }))}
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="maxConcurrent">最大并发任务</Label>
-                    <Input
-                      id="maxConcurrent"
-                      type="number"
-                      min={1}
-                      value={settings.maxConcurrent}
-                      onChange={e =>
-                        setSettings(s => ({ ...s, maxConcurrent: Number(e.target.value || 1) }))
-                      }
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="defaultPrefix">默认消息前缀</Label>
-                    <Input
-                      id="defaultPrefix"
-                      placeholder="例如：[#AI]"
-                      value={settings.defaultPrefix}
-                      onChange={e => setSettings(s => ({ ...s, defaultPrefix: e.target.value }))}
-                    />
-                  </div> */}
                 </div>
 
                 <DialogFooter>

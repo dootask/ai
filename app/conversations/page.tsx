@@ -21,7 +21,7 @@ import { useDebounceCallback } from '@/hooks/use-debounce';
 import { agentsApi } from '@/lib/api/agents';
 import { fetchConversations, fetchMessages } from '@/lib/api/conversations';
 import { Agent, Conversation, Message, PaginationBase } from '@/lib/types';
-import { Bot, Calendar, CheckCircle, Clock, Eye, Filter, MessageSquare, Search, TrendingUp, User } from 'lucide-react';
+import { Bot, Calendar, CheckCircle, Clock, Eye, Filter, MessageSquare, MessageSquareIcon, Search, TrendingUp, User } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { defaultPagination, Pagination } from '../../components/pagination';
 
@@ -184,7 +184,10 @@ export default function ConversationsPage() {
       <div className="space-y-6 p-6">
         <div className="flex items-center justify-between">
           <div className="flex flex-col gap-1">
-            <h1 className="text-3xl font-bold tracking-tight">对话监控</h1>
+            <div className="flex items-center gap-2 mb-2">
+              <MessageSquareIcon className="text-primary h-8 w-8" />
+              <h1 className="text-3xl font-bold tracking-tight">对话监控</h1>
+            </div>
             <p className="text-muted-foreground">查看和分析 AI 处理的对话记录</p>
           </div>
         </div>
@@ -208,7 +211,10 @@ export default function ConversationsPage() {
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-bold tracking-tight">对话监控</h1>
+          <div className="flex items-center gap-2 mb-2">
+            <MessageSquareIcon className="text-primary h-8 w-8" />
+            <h1 className="text-3xl font-bold tracking-tight">对话监控</h1>
+          </div>
           <p className="text-muted-foreground">查看和分析 AI 处理的对话记录</p>
         </div>
         <Button onClick={() => loadData(true)} variant="outline" size="sm">
