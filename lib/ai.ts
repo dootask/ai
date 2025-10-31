@@ -179,25 +179,22 @@ export const embeddingModels = [
     features: ['开源', '轻量级', '快速', 'Hugging Face'],
   },
 ];
-
-// AI提供商配置
 export const providerOptions = [
   {
     value: 'openai' as const,
     name: 'OpenAI',
     baseUrl: 'https://api.openai.com/v1',
     models: [
-      'gpt-4.1',
-      'gpt-4.1-mini',
-      'gpt-4o',
-      'gpt-4o-mini',
-      'o3-mini',
-      'o1',
-      'gpt-4-turbo',
-      'gpt-4',
-      'gpt-3.5-turbo',
+      'gpt-5',             // 最新旗舰模型 :contentReference[oaicite:0]{index=0}
+      'gpt-5-mini',        // 旗舰模型的更轻版本
+      'gpt-4.1',            // 上一代旗舰多模态模型 :contentReference[oaicite:1]{index=1}
+      'gpt-4.1-mini',       // 较为轻量化版本
+      'gpt-4.1-nano',       // 更轻、低成本版本
+      'gpt-4o',             // still supported 多模态旗舰（若有） :contentReference[oaicite:2]{index=2}
+      'gpt-4o-mini',        // 其轻量版本
+      'gpt-3.5-turbo',      // 较为经济实用版本
     ],
-    description: '业界领先的AI模型提供商，2025年最新GPT-4.1系列',
+    description: '业界领先的 AI 模型提供商，OpenAI 最新 GPT-5 系列及衍生版本',
     icon: '🤖',
     color: 'bg-green-100 text-green-800',
     maxTokens: 128000,
@@ -208,17 +205,14 @@ export const providerOptions = [
     name: 'Anthropic',
     baseUrl: 'https://api.anthropic.com',
     models: [
-      'claude-opus-4-20250514',
-      'claude-sonnet-4-20250514',
-      'claude-3-7-sonnet-20250219',
-      'claude-3-5-sonnet-20241022',
-      'claude-3-5-haiku-20241022',
-      'claude-3-5-sonnet-20240620',
-      'claude-3-opus-20240229',
-      'claude-3-sonnet-20240229',
-      'claude-3-haiku-20240307',
+      'claude-opus-4.1',     // 最新 Opus 4.1 :contentReference[oaicite:3]{index=3}
+      'claude-sonnet-4.5',   // 最新 Sonnet 4.5 :contentReference[oaicite:4]{index=4}
+      'claude-haiku-4.5',    // 最新 Haiku 4.5 :contentReference[oaicite:5]{index=5}
+      'claude-3.7-sonnet',   // 较早但仍在用
+      'claude-3.5-sonnet',   // 经济版本
+      'claude-3.5-haiku',    // 最轻量经济版
     ],
-    description: '高质量对话AI模型，Claude 4系列具备卓越推理能力',
+    description: '高质量对话 AI 模型，Claude 最新 4 系列具备卓越推理能力',
     icon: '🧠',
     color: 'bg-orange-100 text-orange-800',
     maxTokens: 200000,
@@ -229,15 +223,12 @@ export const providerOptions = [
     name: 'Google',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
     models: [
-      'gemini-2.5-pro',
-      'gemini-2.5-flash',
-      'gemini-2.0-flash',
-      'gemini-1.5-pro',
-      'gemini-1.5-flash',
-      'gemini-pro',
-      'gemini-pro-vision',
+      'gemini-2.5-pro',      // 最新旗舰模型 :contentReference[oaicite:6]{index=6}
+      'gemini-2.5-flash',    // 较为均衡版本 :contentReference[oaicite:7]{index=7}
+      'gemini-2.5-flash-lite',// 轻量高吞吐版本 :contentReference[oaicite:8]{index=8}
+      'gemini-2.5-flash-image',// 图像专用分支（如 Nano Banana） :contentReference[oaicite:9]{index=9}
     ],
-    description: 'Google最新Gemini 2.5系列，支持超长上下文和多模态',
+    description: 'Google 最新 Gemini 2.5 系列，支持超长上下文与原生多模态能力',
     icon: '🔍',
     color: 'bg-blue-100 text-blue-800',
     maxTokens: 1048576,
@@ -247,8 +238,13 @@ export const providerOptions = [
     value: 'xai' as const,
     name: 'xAI (Grok)',
     baseUrl: 'https://api.x.ai/v1',
-    models: ['grok-4', 'grok-3', 'grok-3-mini', 'grok-beta'],
-    description: 'xAI最新Grok系列，具备实时信息获取能力',
+    models: [
+      'grok-4',             // 假定最新版本
+      'grok-3',             // 次主流版本
+      'grok-3-mini',        // 轻量版
+      'grok-beta',          // 测试版
+    ],
+    description: 'xAI 最新 Grok 系列，具备实时信息获取能力',
     icon: '🚀',
     color: 'bg-purple-100 text-purple-800',
     maxTokens: 256000,
@@ -259,15 +255,15 @@ export const providerOptions = [
     name: 'Meta (Llama)',
     baseUrl: 'https://api.llama-api.com/v1',
     models: [
-      'llama-4-maverick',
-      'llama-4-scout',
-      'llama-3.3-70b-instruct',
-      'llama-3.2-90b-vision-instruct',
+      'llama-4-maverick',   // 最新 Multimodal 开源模型 :contentReference[oaicite:10]{index=10}
+      'llama-4-scout',      // 同系列较轻版 :contentReference[oaicite:11]{index=11}
+      'llama-3.3-70b-instruct', // 较旧版本仍可用
+      'llama-3.2-90b-vision-instruct', // …
       'llama-3.1-405b-instruct',
       'llama-3.1-70b-instruct',
       'llama-3.1-8b-instruct',
     ],
-    description: 'Meta最新Llama 4系列，开源高性能大语言模型',
+    description: 'Meta 最新 Llama 4 系列，开源高性能大语言模型',
     icon: '🦙',
     color: 'bg-indigo-100 text-indigo-800',
     maxTokens: 128000,
@@ -277,7 +273,12 @@ export const providerOptions = [
     value: 'deepseek' as const,
     name: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/v1',
-    models: ['deepseek-r1', 'deepseek-v3', 'deepseek-coder-v2', 'deepseek-chat'],
+    models: [
+      'deepseek-v3',         // 最新主版本
+      'deepseek-r1',         // 较早版本
+      'deepseek-coder-v2',   // 编程专用
+      'deepseek-chat',       // 聊天专用
+    ],
     description: '深度求索最新推理模型，在数学和编程方面表现卓越',
     icon: '🔬',
     color: 'bg-cyan-100 text-cyan-800',
@@ -289,13 +290,13 @@ export const providerOptions = [
     name: 'Alibaba (Qwen)',
     baseUrl: 'https://dashscope.aliyuncs.com/api/v1',
     models: [
-      'qwen3-235b',
+      'qwen3-235b',        // 最新旗舰中文模型
       'qwen2.5-72b-instruct',
       'qwen2.5-32b-instruct',
       'qwen2.5-14b-instruct',
       'qwen2.5-7b-instruct',
     ],
-    description: '阿里云通义千问3.0系列，中文理解能力突出',
+    description: '阿里云通义千问 3.0 系列，中文理解能力突出',
     icon: '🌟',
     color: 'bg-yellow-100 text-yellow-800',
     maxTokens: 128000,
@@ -305,8 +306,13 @@ export const providerOptions = [
     value: 'cohere' as const,
     name: 'Cohere',
     baseUrl: 'https://api.cohere.ai/v1',
-    models: ['command-a', 'command-r-plus', 'command-r', 'command-nightly'],
-    description: 'Cohere企业级AI模型，专注于企业应用场景',
+    models: [
+      'command-a',        // 企业级通用模型
+      'command-r-plus',   // 推理版本
+      'command-r',        // 经济版本
+      'command-nightly',  // 夜间实验版本
+    ],
+    description: 'Cohere 企业级 AI 模型，专注于企业应用场景',
     icon: '💼',
     color: 'bg-teal-100 text-teal-800',
     maxTokens: 256000,
@@ -316,8 +322,14 @@ export const providerOptions = [
     value: 'azure' as const,
     name: 'Azure OpenAI',
     baseUrl: 'https://your-resource.openai.azure.com',
-    models: ['gpt-4o', 'gpt-4-turbo', 'gpt-4', 'gpt-35-turbo', 'gpt-4-32k'],
-    description: '微软Azure AI服务，企业级安全和合规',
+    models: [
+      'gpt-5',             // 使用 Azure 托管的 OpenAI 最新版本
+      'gpt-4o',            // 兼容旧版本
+      'gpt-4-turbo',       // …
+      'gpt-4',             // …
+      'gpt-3.5-turbo',     // …
+    ],
+    description: '微软 Azure AI 服务，企业级安全和合规',
     icon: '☁️',
     color: 'bg-purple-100 text-purple-800',
     maxTokens: 128000,
@@ -327,8 +339,16 @@ export const providerOptions = [
     value: 'local' as const,
     name: '本地模型',
     baseUrl: 'http://localhost:11434',
-    models: ['llama3.2', 'llama3.1', 'qwen2.5', 'mistral-nemo', 'gemma2', 'codellama', 'deepseek-coder'],
-    description: '本地部署开源模型，支持Ollama等本地服务',
+    models: [
+      'llama3.2',           // 本地开源版本
+      'llama3.1',           // …
+      'qwen2.5',            // …
+      'mistral-nemo',       // …
+      'gemma2',             // …
+      'codellama',          // 编程专用
+      'deepseek-coder',     // 本地推理版
+    ],
+    description: '本地部署开源模型，支持 O llama 等本地服务',
     icon: '🏠',
     color: 'bg-gray-100 text-gray-800',
     maxTokens: 32000,

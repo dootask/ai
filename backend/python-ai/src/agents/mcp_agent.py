@@ -6,7 +6,8 @@ from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.func import entrypoint
 from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
-
+import logging
+logger = logging.getLogger("uvicorn")
 
 @entrypoint()
 async def mcp_agent(
@@ -18,8 +19,8 @@ async def mcp_agent(
     
     messages = inputs["messages"]
     # 1. 合并历史消息
-    # if previous:
-    #     messages = previous["messages"] + messages
+    if previous:
+       messages = previous["messages"] + messages
     configurable = config.get("configurable",{})
     
     # 2. 动态决定模型
@@ -32,7 +33,7 @@ async def mcp_agent(
     if config_tuple is None:
         config = {}
     mcp_config = json.loads(config_tuple) if config_tuple else {}
-    print(mcp_config)
+    logger.info(mcp_config)
     client = MultiServerMCPClient(
         mcp_config
     )
@@ -56,7 +57,7 @@ async def mcp_agent(
     messages = [SystemMessage(content=agent_config.get("prompt",""))] + messages
     response = await graph.ainvoke({"messages": messages})
     final_messages = response["messages"]
-    print(response)
+    logger.info(response)
     return entrypoint.final(
         value={"messages": final_messages}, save={"messages": final_messages}
     )

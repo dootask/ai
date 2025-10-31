@@ -24,14 +24,14 @@ from schema.schema import ServiceMetadata
 load_dotenv()
 
 warnings.filterwarnings("ignore", category=LangChainBetaWarning)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 def ensure_nltk_resource(resource_path, download_name=None):
     try:
         nltk.data.find(resource_path)
-        print(f"✔ 已存在: {resource_path}")
+        logger.info(f"✔ 已存在: {resource_path}")
     except LookupError:
-        print(f"⬇ 未找到 {resource_path}, 正在下载...")
+        logger.info(f"⬇ 未找到 {resource_path}, 正在下载...")
         nltk.download(download_name or resource_path.split('/')[-1])
 
 
