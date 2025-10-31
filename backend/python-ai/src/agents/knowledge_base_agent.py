@@ -1,5 +1,4 @@
 import json
-import logging
 import os
 from typing import Any
 
@@ -18,7 +17,8 @@ from langchain.retrievers import MergerRetriever
 
 from core.embeddings import get_embeddings_by_provider
 
-logger = logging.getLogger(__name__)
+import logging
+logger = logging.getLogger("uvicorn")
 
 
 # Define the state

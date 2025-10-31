@@ -281,7 +281,7 @@ def get_model_by_provider(
 
     # 创建并返回模型实例
     model_class = provider_config["class"]
-    print(model_params)
+
     if cfg("proxy_url"):
         os.environ["https_proxy"] = cfg("proxy_url")
         os.environ["http_proxy"] = cfg("proxy_url")

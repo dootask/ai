@@ -1,11 +1,5 @@
 import json
-import re
-import tempfile
-import time
-from io import BytesIO
-from typing import Any
 
-import httpx
 from core import get_model_by_provider, settings
 
 from langchain_core.language_models.base import LanguageModelInput
@@ -14,7 +8,8 @@ from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_core.runnables import (Runnable, RunnableConfig, RunnableLambda,
                                       RunnableSerializable)
 from langgraph.func import entrypoint
-
+import logging
+logger = logging.getLogger("uvicorn")
 
 
 @entrypoint()
@@ -25,7 +20,7 @@ async def chatbot(
     config: RunnableConfig,
 ):
     messages = inputs["messages"]
-
+    
     configurable = config.get("configurable",{})
     model = get_model_by_provider(
         configurable.get("provider"),
@@ -41,7 +36,7 @@ async def chatbot(
         messages = [SystemMessage(content=agent_config.get("prompt",""))] + messages
 
     response = await llm.ainvoke(messages)
-
+    logger.info("chatbot----response-----%s",response)
     return entrypoint.final(
         value={"messages": [response]}, save={"messages": messages + [response]}
     )
