@@ -152,7 +152,7 @@ func (h *Handler) Webhook(c *gin.Context) {
 	// 创建对话
 	var conversation conversations.Conversation
 	dialogId := strconv.Itoa(webhookResponse.DialogID)
-	userID := strconv.Itoa(int(agent.UserID))
+	userID := strconv.Itoa(int(req.MsgUid))
 	if err := global.DB.Where("agent_id = ? AND dootask_chat_id = ? AND dootask_user_id = ?", agent.ID, dialogId, userID).First(&conversation).Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			conversation = conversations.Conversation{
