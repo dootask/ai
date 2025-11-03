@@ -436,20 +436,20 @@ export default function ConversationsPage() {
                                       key={message.id}
                                       className={`rounded-lg p-3 ${
                                         message.role === 'user'
-                                          ? 'border-l-4 border-blue-500 bg-blue-50'
-                                          : 'border-l-4 border-green-500 bg-green-50'
+                                          ? 'border-l-4 border-blue-500 bg-blue-50 dark:border-blue-400/40 dark:bg-blue-900/30'
+                                          : 'border-l-4 border-green-500 bg-green-50 dark:border-green-400/40 dark:bg-green-900/30'
                                       }`}
                                     >
                                       <div className="mb-2 flex items-center gap-2">
                                         {message.role === 'user' ? (
                                           <>
                                             <User className="h-4 w-4 text-blue-500" />
-                                            <span className="text-sm font-medium text-blue-700">用户</span>
+                                            <span className="text-sm font-medium text-blue-700 dark:text-blue-300">用户</span>
                                           </>
                                         ) : (
                                           <>
                                             <Bot className="h-4 w-4 text-green-500" />
-                                            <span className="text-sm font-medium text-green-700">AI助手</span>
+                                            <span className="text-sm font-medium text-green-700 dark:text-green-300">AI助手</span>
                                           </>
                                         )}
                                         <span className="text-muted-foreground ml-auto text-xs">

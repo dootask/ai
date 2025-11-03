@@ -1,117 +1,150 @@
-# DooTask AI 智能体插件
+# AI Agent Plugin
 
-> 基于 **DooTask** 主程序的企业级 AI 智能体插件系统
+<div align="center">
 
-[![Version](https://img.shields.io/badge/version-0.1.1-blue.svg)](https://github.com/dootask/ai)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![DooTask](https://img.shields.io/badge/DooTask-Plugin-orange.svg)](https://dootask.com)
+# 🤖 AI Agent Plugin
 
-## ✨ 核心功能
+**Empower DooTask with enterprise-grade AI assistant capabilities for an intelligent team experience**
 
-### 🚀 **一键集成 AI 智能体**
-- 无需复杂配置，安装即可使用
-- 支持多种 AI 模型（GPT-3.5、GPT-4、Claude 等）
-- 智能对话，自然语言交互
+[![Version Requirement](https://img.shields.io/badge/DooTask->=1.1.66-blue)](https://dootask.com)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-### 🎯 **专业角色定制**
-- **客服助手**：24/7 在线客服支持
-- **项目管理**：智能任务分配和进度跟踪
-- **知识专家**：企业知识库问答
-- **数据分析**：智能报表生成和数据分析
+</div>
 
-### 🔗 **无缝集成 DooTask**
-- 直接在 DooTask 聊天中使用
-- 支持群聊和私聊
-- 实时响应，流畅对话体验
+## ✨ Core Features
 
-## 🎬 快速体验
+### 🤖 **Multi-Agent Management**
+- **Role Customization**: Visual configuration of AI roles, expertise areas, and capabilities
+- **Prompt Engineering**: Advanced prompt editor with template and variable support
+- **Agent Marketplace**: Rich preset agent templates for quick deployment
 
-### 1. **安装插件**
-在 DooTask 应用商店搜索 "AI 智能体" 并安装
+### 💬 **Real-time Conversation System**
+- **Streaming Responses**: SSE real-time updates for smooth, natural experience
+- **Group Chat Support**: Perfect support for group conversations with intelligent context understanding
+- **Image Recognition**: Support for image content recognition and understanding
+- **Thinking Process**: Display AI thinking process, support for thinking models (e.g., DeepSeek)
 
-### 2. **配置智能体**
-- 选择预设模板或自定义角色
-- 配置 AI 模型和工具权限
-- 设置对话风格和行为模式
+### 🛠️ **MCP Tool Integration**
+- **Internal Tools**: Deep integration with DooTask features (chat history, project management, task assignment)
+- **External Tools**: Support for third-party services like weather queries, web search, email sending
+- **Auto Association**: Automatic detection of MCP services and association with agents
+- **Permission Control**: Fine-grained control over tool access permissions for different agents
 
-### 3. **开始对话**
-在任意聊天中 @AI 智能体，即可开始智能对话
+### 📚 **Knowledge Base System**
+- **Multi-format Support**: PDF, Word, Excel, Markdown, TXT, and other document formats
+- **Vectorized Retrieval**: Semantic search based on AI Embedding for precise matching
+- **Document Management**: Complete document upload, parsing, and version management mechanism
+- **Smart Chunking**: Automatic optimization of document chunking strategy to improve retrieval effectiveness
 
-## 💡 使用场景
+### 📊 **Data Statistics & Monitoring**
+- **Token Statistics**: Complete AI usage statistics and cost monitoring
+- **Conversation Monitoring**: Real-time monitoring of conversation status and performance metrics
+- **Usage Analytics**: Agent usage statistics and popular recommendations
 
-### 🏢 **企业办公**
-- **会议助手**：会议纪要整理、行动项提取
-- **文档专家**：合同审查、报告生成
-- **流程优化**：工作流程分析和改进建议
+### 🏢 **Enterprise Features**
+- **Permission Management**: Role-based fine-grained access control
+- **Audit Logging**: Complete operation and conversation audit trail
+- **Multi-tenant Support**: Support for multiple enterprises to use independently
 
-### 🎓 **教育培训**
-- **学习伙伴**：个性化学习计划制定
-- **知识问答**：专业领域知识解答
-- **作业辅导**：智能作业检查和指导
+## 📖 User Guide
 
-### 💼 **客户服务**
-- **智能客服**：7×24 小时在线服务
-- **问题诊断**：快速问题识别和解决方案
-- **满意度提升**：个性化服务体验
+### Create Your First Agent
 
-### 🔬 **研发创新**
-- **代码助手**：编程问题解答、代码审查
-- **技术咨询**：技术方案设计和评估
-- **创新思维**：创意激发和方案优化
+1. Visit the **Agent Management** page
+2. Click the **Create Agent** button
+3. Configure agent information:
+   - **Name and Description**: Define basic information for the agent
+   - **Role Prompt**: Set the AI's role and behavior patterns
+   - **Model Selection**: Choose from GPT-4, Claude, DeepSeek, and other models
+   - **Tool Permissions**: Select MCP tools the agent can use
+   - **Knowledge Base Binding**: Associate relevant knowledge bases
+4. Save and enable the agent
 
-## 🎯 核心优势
+### Integrate DooTask Bot
 
-### ⚡ **高性能**
-- 基于 Go + Python 微服务架构
-- 支持高并发对话
-- 响应速度快，延迟低
+1. Create a bot in DooTask
+2. Configure the bot's Webhook address (e.g., `http://your-domain/api/webhook/message`)
+3. Bind the bot ID and agent in the plugin
+4. Start conversing with AI agents in DooTask
 
-### 🔒 **安全可靠**
-- 企业级数据安全
-- 端到端加密保护
-- 完整的审计日志
+### Manage Knowledge Bases
 
-### 🌐 **开放生态**
-- 支持 MCP 协议扩展
-- 丰富的第三方工具集成
-- 可定制化程度高
+1. Visit the **Knowledge Base Management** page
+2. Create a knowledge base and configure the Embedding model
+3. Upload documents (supports PDF, Word, Markdown, and other formats)
+4. System automatically performs document parsing and vectorization
+5. Bind the knowledge base to the corresponding agent
 
-### 💰 **成本效益**
-- 按需使用，资源优化
-- 支持多种 AI 模型选择
-- 降低企业 AI 应用门槛
+### Configure MCP Tools
 
-## 技术特色
+1. Visit the **MCP Tool Management** page
+2. Add MCP service address and configuration
+3. System automatically detects available tools
+4. Select required tools when creating an agent
 
-- **多模型支持**：OpenAI、Anthropic、Google 等主流 AI 模型
-- **智能上下文**：自动维护对话历史和上下文理解
-- **知识库集成**：支持企业文档和知识库问答
-- **实时更新**：SSE 流式响应，用户体验流畅
+## 🎯 Use Cases
 
-### 🔄 **更新服务**
-- 定期功能更新
-- 性能优化升级
-- 新特性抢先体验
+### 💼 **Enterprise Customer Service Assistant**
+- Quickly answer customer questions based on knowledge base
+- Automatically handle common inquiries, improve service efficiency
+- Support multiple languages and context understanding
 
-## 版本更新
+### 📋 **Project Management Assistant**
+- Intelligent task assignment and suggestions
+- Project progress analysis and risk assessment
+- Automatic generation of project reports and summaries
 
-### v0.1.1 (当前版本)
-- ✨ 新增多模型支持
-- 🐛 修复已知问题
-- 🔄 性能优化提升
-- 📱 移动端体验优化
+### 📚 **Knowledge Management**
+- Enterprise document intelligent retrieval
+- Knowledge graph construction and management
+- Team knowledge sharing and collaboration
 
-## 联系我们
+### 🤝 **Team Collaboration**
+- Group chat intelligent assistant
+- Meeting records and summaries
+- Document collaboration and review
 
-- **官方网站**：[https://dootask.com](https://dootask.com)
+## 🔧 Technical Architecture
 
-## 📄 许可证
+- **Frontend**: Next.js 15 + TypeScript + shadcn/ui
+- **Backend**: Go (main service) + Python (AI engine)
+- **Database**: PostgreSQL + pgvector (vector search)
+- **Cache**: Redis
+- **AI Framework**: LangChain + MCP Protocol
 
-本项目基于 [MIT 许可证](https://opensource.org/licenses/MIT) 开源。
+## 📝 Changelog
+
+### Latest Version Features
+
+- ✅ **Image Recognition**: Support for image content recognition and understanding
+- ✅ **Group Chat Support**: Perfect support for group conversations
+- ✅ **Thinking Process Display**: Display AI thinking process
+- ✅ **MCP Auto Association**: Automatic detection of MCP services and association with agents
+- ✅ **Multi-format Documents**: Support for PDF, Word, Excel, Markdown, TXT
+- ✅ **Token Statistics**: Complete usage statistics and cost monitoring
+- ✅ **Streaming Response Optimization**: Fixed handling issues with multiple concurrent requests
+- ✅ **Session Management Optimization**: Fixed user ID identification issues
+
+## 🤝 Contributing
+
+We welcome all forms of contributions!
+
+- 🐛 [Report Bug](https://github.com/dootask/ai/issues)
+- 💡 [Feature Suggestion](https://github.com/dootask/ai/discussions)
+- 🔧 [Submit PR](https://github.com/dootask/ai/pulls)
+
+## 📄 License
+
+This project is open source under the [MIT License](../LICENSE).
+
+## 📞 Support
+
+- 📖 [Full Documentation](https://github.com/dootask/ai/tree/main/docs)
+- 💬 [Community Discussions](https://github.com/dootask/ai/discussions)
+- 🐛 [Issue Feedback](https://github.com/dootask/ai/issues)
 
 ---
 
 <div align="center">
-  <strong>让 AI 为你的工作赋能，提升效率，创造价值！</strong><br/>
   Made with ❤️ by <a href="https://dootask.com">DooTask Team</a>
 </div>

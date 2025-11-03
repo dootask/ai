@@ -32,18 +32,18 @@ const MessageContent: React.FC<MessageContentProps> = ({ content, messageRole })
         <div
           key={`quote-${match.index}`}
           className={`my-3 rounded-md border-l-4 p-3 ${
-            messageRole === 'user' 
-              ? 'border-blue-300 bg-blue-50/50' 
+            messageRole === 'user'
+              ? 'border-blue-300 bg-blue-50/50 dark:border-blue-400/30 dark:bg-blue-900/20'
               : messageRole === 'system'
-              ? 'border-purple-300 bg-purple-50/50'
-              : 'border-gray-300 bg-gray-50/50'
+              ? 'border-purple-300 bg-purple-50/50 dark:border-purple-400/30 dark:bg-purple-900/20'
+              : 'border-gray-300 bg-gray-50/50 dark:border-gray-500/30 dark:bg-gray-900/20'
           }`}
         >
-          <div className="mb-2 flex items-center gap-1 text-xs text-gray-500">
+          <div className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
             <Quote className="h-3 w-3" />
             <span>引用内容</span>
           </div>
-          <div className="whitespace-pre-wrap text-sm text-gray-700 italic">
+          <div className="whitespace-pre-wrap text-sm italic text-foreground">
             {quotedText.trim()}
           </div>
         </div>
