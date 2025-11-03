@@ -1,0 +1,46 @@
+name: Update Plugin
+
+# 需要配置的变量
+# DOOTASK_USERNAME
+# DOOTASK_PASSWORD
+# DOCKER_USERNAME
+# DOCKER_PASSWORD
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Plugin Version'
+        required: true
+        default: '0.1.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+          
+      - name: Create dootask-plugin tar.gz package
+        run: |
+          cd dootask-plugin/0.1.0
+          cp .env_example .env
+          cd ..
+          mv 0.1.0 ${{ github.event.inputs.version }}
+          tar -czf ../dootask-plugin.tar.gz .
+          cd ..
+          echo "Package created: dootask-plugin.tar.gz"
+          ls -la dootask-plugin.tar.gz
+
+      - name: Publish to DooTask App Store
+        id: publish
+        uses: dootask/appstore-action@v2
+        with:
+          username: ${{ secrets.DOOTASK_USERNAME }}
+          password: ${{ secrets.DOOTASK_PASSWORD }}
+          appid: 'ai-agent'
+          package_file: './dootask-plugin.tar.gz'
+          draft: false
