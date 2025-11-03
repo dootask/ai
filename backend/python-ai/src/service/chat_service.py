@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator
 from typing import Any
 from uuid import UUID, uuid4
 import re
-import tempfile
+import httpx
 import time
 from io import BytesIO
 
@@ -182,7 +182,7 @@ class ChatService:
                     "text": "\n\n".join(final_text_parts)
                 })
 
-            if content_list:
+            if content_list and isinstance(input, dict):
                 input["messages"] = input["messages"] + [HumanMessage(content=content_list)]
 
         kwargs = {

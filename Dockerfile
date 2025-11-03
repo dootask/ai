@@ -6,7 +6,7 @@ WORKDIR /app
 COPY backend/go-service/ ./
 RUN go mod tidy
 ENV GIN_MODE=release
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=$(echo $TARGETPLATFORM | cut -d'/' -f2) \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=$(echo $TARGETPLATFORM | cut -d'/' -f2) \
     go build -o go-service main.go
 
 # =============================================================

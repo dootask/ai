@@ -58,7 +58,7 @@ func AuthMiddleware() gin.HandlerFunc {
 // UserRoleMiddleware 用户权限中间件
 func UserRoleMiddleware(role ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		AuthMiddleware()(c)
+		// AuthMiddleware()(c)
 
 		// 如果认证错误不为空，则返回401
 		if v, ok := c.Get(global.CtxKeyAuthError); ok && v != nil {

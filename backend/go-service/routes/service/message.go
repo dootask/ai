@@ -356,8 +356,13 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 						if len(toolData.ToolCalls) > 0 {
 							currentMessageType = "tool"
 							mcpUsed := []string{}
+							// 获取用户语言，默认为 "en-US"
+							userLang := req.MsgUser.Lang
+							if userLang == "" {
+								userLang = "zh"
+							}
 							for _, toolCall := range toolData.ToolCalls {
-								content := fmt.Sprintf("#### MCP工具调用: %s\n", toolCall.Name)
+								content := utils.T(userLang, utils.TranslationKeyMcpToolCallWithName, toolCall.Name)
 								tokenBuffer = append(tokenBuffer, content)
 								if time.Since(lastCompressTime) >= compressInterval {
 									v.Type = "tool"
@@ -370,7 +375,7 @@ func (h *MessageHandler) writeAIResponseToRedis(ctx context.Context, body io.Rea
 							mcpUsedJson, _ := json.Marshal(mcpUsed)
 							h.createMessage(CreateMessage{
 								Req:          req,
-								Content:      "MCP工具调用",
+								Content:      utils.T(userLang, utils.TranslationKeyMcpToolCall),
 								StartTime:    startTime,
 								Status:       1,
 								InputTokens:  toolData.UsageMetadata.InputTokens,
