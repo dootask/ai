@@ -1,6 +1,3 @@
-# DooTask AI 智能体插件
-
-<div align="center">
 
 # 🤖 DooTask AI 智能体插件
 
@@ -12,78 +9,108 @@
 [![LangChain](https://img.shields.io/badge/LangChain-Latest-green)](https://langchain.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://typescriptlang.org/)
 
-</div>
 
-## ✨ 功能特性
+## ✨ 核心功能
 
-### 🤖 多智能体管理
-
+### 🤖 **多智能体管理**
 - **角色定制**：可视化配置 AI 角色、专业领域和能力范围
 - **提示词工程**：高级提示词编辑器，支持模板和变量
-- **智能体市场**：丰富的预设智能体模板库
+- **智能体市场**：丰富的预设智能体模板，快速部署
 
-### 🔄 实时对话系统
+### 💬 **实时对话系统**
+- **流式回复**：SSE 实时更新，体验流畅自然
+- **群聊支持**：完美支持群组对话，智能理解上下文
+- **图片识别**：支持图片内容识别和理解
+- **思考过程**：显示 AI 的思考过程，支持思考型模型（如 DeepSeek）
 
-- **Webhook 集成**：无缝对接 DooTask 机器人系统
-- **SSE 实时更新**：流式 AI 回复，用户体验流畅
-- **上下文管理**：智能维护对话历史和上下文
-
-### 🛠️ MCP 协议集成
-
+### 🛠️ **MCP 工具集成**
 - **内部工具**：深度集成 DooTask 功能（聊天记录、项目管理、任务分配）
 - **外部工具**：支持天气查询、网页搜索、邮件发送等第三方服务
-- **工具权限**：精细化控制不同智能体的工具访问权限
+- **自动关联**：定时检测 MCP 服务，自动关联到智能体
+- **权限控制**：精细化控制不同智能体的工具访问权限
 
-### 📚 知识库系统
+### 📚 **知识库系统**
+- **多格式支持**：PDF、Word、Excel、Markdown、TXT 等文档格式
+- **向量化检索**：基于 AI Embedding 的语义搜索，精准匹配
+- **文档管理**：完整的文档上传、解析、版本管理机制
+- **智能分块**：自动优化文档分块策略，提升检索效果
 
-- **多格式支持**：PDF、Word、Excel、Markdown 等文档格式
-- **向量化检索**：基于 AI Embedding 的语义搜索
-- **版本控制**：完整的知识库版本管理机制
+### 📊 **数据统计与监控**
+- **Token 统计**：完整的 AI 使用统计和成本监控
+- **对话监控**：实时监控对话状态和性能指标
+- **使用分析**：智能体使用情况统计和热门推荐
 
-### 🏢 企业级特性
-
-- **多租户支持**：支持多个企业独立使用
+### 🏢 **企业级特性**
 - **权限管理**：基于角色的精细访问控制
 - **审计日志**：完整的操作和对话审计追踪
-- **数据安全**：端到端加密和隐私保护
+- **多租户支持**：支持多个企业独立使用
 
-## 🏗️ 技术架构
+## 📖 使用指南
 
-```mermaid
-graph TB
-    subgraph "DooTask 主程序"
-        DT[聊天系统]
-        BOT[机器人]
-    end
+### 创建第一个智能体
 
-    subgraph "AI 插件系统"
-        subgraph "前端层"
-            UI[Next.js]
-            COMP[shadcn/ui]
-        end
+1. 访问 **智能体管理** 页面
+2. 点击 **创建智能体** 按钮
+3. 配置智能体信息：
+   - **名称和描述**：定义智能体的基本信息
+   - **角色提示词**：设置 AI 的角色和行为模式
+   - **模型选择**：选择 GPT-4、Claude、DeepSeek 等模型
+   - **工具权限**：选择智能体可以使用的 MCP 工具
+   - **知识库绑定**：关联相关的知识库
+4. 保存并启用智能体
 
-        subgraph "服务层"
-            GO[Go 主服务]
-            PY[Python AI]
-        end
+### 集成 DooTask 机器人
 
-        subgraph "协议层"
-            MCP[MCP 协议]
-            TOOLS[工具集成]
-        end
+1. 在 DooTask 中创建机器人
+2. 配置机器人的 Webhook 地址（如：`http://your-domain/api/webhook/message`）
+3. 在插件中绑定机器人 ID 和智能体
+4. 开始在 DooTask 中与 AI 智能体对话
 
-        subgraph "数据层"
-            PG[(PostgreSQL)]
-            REDIS[(Redis)]
-            VECTOR[(Vector DB)]
-        end
-    end
+### 管理知识库
 
-    DT -->|Webhook| GO
-    GO --> PY
-    PY --> MCP
-    MCP --> TOOLS
-```
+1. 访问 **知识库管理** 页面
+2. 创建知识库并配置 Embedding 模型
+3. 上传文档（支持 PDF、Word、Markdown 等格式）
+4. 系统自动进行文档解析和向量化
+5. 将知识库绑定到相应的智能体
+
+### 配置 MCP 工具
+
+1. 访问 **MCP 工具管理** 页面
+2. 添加 MCP 服务地址和配置
+3. 系统会自动检测可用的工具
+4. 在创建智能体时选择需要的工具
+
+## 🎯 应用场景
+
+### 💼 **企业客服助手**
+- 基于知识库快速回答客户问题
+- 自动处理常见咨询，提升服务效率
+- 支持多语言和上下文理解
+
+### 📋 **项目管理助手**
+- 智能任务分配和建议
+- 项目进度分析和风险评估
+- 自动生成项目报告和总结
+
+### 📚 **知识管理**
+- 企业文档智能检索
+- 知识图谱构建和管理
+- 团队知识共享和协作
+
+### 🤝 **团队协作**
+- 群聊智能助手
+- 会议记录和总结
+- 文档协作和审阅
+
+## 🔧 技术架构
+
+- **前端**：Next.js 15 + TypeScript + shadcn/ui
+- **后端**：Go（主服务）+ Python（AI 引擎）
+- **数据库**：PostgreSQL + pgvector（向量搜索）
+- **缓存**：Redis
+- **AI 框架**：LangChain + MCP 协议
+
 
 ### 核心技术栈
 
@@ -129,32 +156,6 @@ npm run dev:all
 - **API 文档**: http://localhost:8080/swagger (开发中)
 - **数据库**: PostgreSQL (localhost:5432)
 
-## 📖 使用指南
-
-### 配置智能体
-
-1. 访问 [智能体管理页面](http://localhost:3000/agents)
-2. 点击"创建智能体"按钮
-3. 配置智能体信息：
-   - **名称和描述**：定义智能体的基本信息
-   - **角色提示词**：设置 AI 的角色和行为模式
-   - **模型选择**：选择 GPT-3.5、GPT-4 等模型
-   - **工具权限**：选择智能体可以使用的工具
-   - **知识库绑定**：关联相关的知识库
-
-### 集成 DooTask 机器人
-
-1. 在 DooTask 中创建机器人
-2. 配置机器人的 Webhook 地址：`http://your-domain/api/webhook/message`
-3. 在插件中绑定机器人 ID 和智能体
-4. 开始在 DooTask 中与 AI 智能体对话
-
-### 管理知识库
-
-1. 访问 [知识库管理页面](http://localhost:3000/knowledge)
-2. 创建知识库并上传文档
-3. 系统自动进行文档解析和向量化
-4. 将知识库绑定到相应的智能体
 
 ## 🛠️ 开发指南
 
@@ -249,8 +250,3 @@ npm run stop:all
 - 问题反馈：[Issues](https://github.com/dootask/ai/issues)
 - 功能建议：[Discussions](https://github.com/dootask/ai/discussions)
 
----
-
-<div align="center">
-  Made with ❤️ by <a href="https://dootask.com">DooTask Team</a>
-</div>
