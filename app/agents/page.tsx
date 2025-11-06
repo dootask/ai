@@ -35,7 +35,8 @@ export default function AgentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settings, setSettings] = useState({
-    autoAssignMCP: true,
+    autoAssignMCP: false,
+    response: {}
   });
 
   const handleSaveSettings = async () => {
@@ -54,6 +55,7 @@ export default function AgentsPage() {
       setSettings(prevSettings => ({
         ...prevSettings,
         autoAssignMCP: settingsResponse.autoAssignMCP === '0' ? false : true,
+        response: settingsResponse
       }));
       const response = await agentsApi.list({
         page: pagination.current_page,
@@ -220,7 +222,7 @@ export default function AgentsPage() {
                 <span
                   role="button"
                   aria-label="设置"
-                  className="hover:bg-muted text-muted-foreground inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded"
+                  className="hover:bg-muted text-muted-foreground inline-flex h-8 w-8 mb-2 cursor-pointer items-center justify-center rounded"
                 >
                   <Settings className="h-4 w-4" />
                 </span>
@@ -234,9 +236,10 @@ export default function AgentsPage() {
                 <div className="space-y-4 py-2">
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
-                      <div className="text-sm font-medium leading-none">自动关联dootask mcp</div>
+                      <div className="text-sm font-medium leading-none">自动关联DooTask MCP</div>
                     </div>
                     <Switch
+                      disabled={!settings.response || Object.keys(settings.response).length === 0}
                       checked={settings.autoAssignMCP}
                       onCheckedChange={(v: boolean) => setSettings(s => ({ ...s, autoAssignMCP: v }))}
                     />
