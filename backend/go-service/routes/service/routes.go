@@ -561,7 +561,7 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 
 	global.DB.Where("user_id = ? AND is_active = ? AND category = ?", 0, true, "dootask").Find(&dootaskMcp)
 	if req.MsgUid != 0 {
-		global.DB.Where("user_id = ? AND key = ? AND value = ?", req.MsgUid, "autoAssignMCP", "0").Find(&userConfig)
+		global.DB.Where("user_id = ? AND key = ? AND value = ?", req.MsgUid, "autoAssignMCP", "1").Find(&userConfig)
 	}
 	// 检查是否使用MCP
 	if agent.Tools != nil {
@@ -593,7 +593,7 @@ func (h *Handler) requestAI(aiModel aimodels.AIModel, agent agents.Agent, req We
 			}
 		}
 	}
-	if len(dootaskMcp) > 0 && len(userConfig) == 0 {
+	if len(dootaskMcp) > 0 && len(userConfig) > 0 {
 		var dootaskConfig map[string]any
 		json.Unmarshal(dootaskMcp[0].Config, &dootaskConfig)
 		dootaskConfig["transport"] = "streamable_http"

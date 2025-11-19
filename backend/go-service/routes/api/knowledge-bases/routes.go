@@ -959,7 +959,11 @@ func DeleteDocument(c *gin.Context) {
 
 	// 提交事务
 	tx.Commit()
-
+	// 提交事务后，删除PGVector中的向量数据
+	if err := deleteVectorEmbeddings(kbId, doc.Title); err != nil {
+		// 记录日志，但不影响主流程
+		log.Printf("删除向量数据失败: %v", err)
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"code":    "SUCCESS",
 		"message": "文档删除成功",
@@ -967,22 +971,13 @@ func DeleteDocument(c *gin.Context) {
 	})
 }
 
-// getFileExtension 根据文件类型获取文件扩展名
-func getFileExtension(fileType string) string {
-	switch fileType {
-	case "pdf":
-		return ".pdf"
-	case "docx":
-		return ".docx"
-	case "doc":
-		return ".doc"
-	case "markdown", "md":
-		return ".md"
-	case "txt", "text":
-		return ".txt"
-	default:
-		return ".txt"
-	}
+// 删除PGVector中的向量数据
+func deleteVectorEmbeddings(source int64, docName string) error {
+	// 假设你的向量表名为 langchain_pg_embedding
+	query := `DELETE FROM langchain_pg_embedding WHERE cmetadata->>'source' = (SELECT name FROM knowledge_bases WHERE id = $1) AND cmetadata->>'filename' = $2`
+
+	result := global.DB.Exec(query, source, docName)
+	return result.Error
 }
 
 // getFileTypeFromName 从文件名获取文件类型

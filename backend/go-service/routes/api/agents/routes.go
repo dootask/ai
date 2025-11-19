@@ -1029,7 +1029,16 @@ func GetUserConfig(c *gin.Context) {
 			UpdatedAt:   config.UpdatedAt,
 		})
 	}
+	var result []map[string]interface{}
 
+	err = global.DB.Table("mcp_tools").Where("user_id = ? AND is_active = ? AND category = ?", 0, true, "dootask").Find(&result).Error
+	if err == nil {
+		response = append(response, ConfigResponse{
+			Key:         "default_mcp_tool",
+			Value:       "0",
+			Description: "默认DooTask工具配置",
+		})
+	}
 	c.JSON(200, gin.H{
 		"message": "获取配置成功",
 		"data":    response,

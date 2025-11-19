@@ -51,10 +51,9 @@ export default function AgentsPage() {
     setIsLoading(true);
     try {
       const settingsResponse = await agentsApi.getSettings();
-      console.log(settingsResponse);
       setSettings(prevSettings => ({
         ...prevSettings,
-        autoAssignMCP: settingsResponse.autoAssignMCP === '0' ? false : true,
+        autoAssignMCP: settingsResponse.autoAssignMCP === '1' ? true : false,
         response: settingsResponse
       }));
       const response = await agentsApi.list({
