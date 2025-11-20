@@ -73,7 +73,7 @@ class DocumentService:
             st = time.time()
             if file_extension == ".pdf":
                 loader = PyMuPDFLoader(file_path=tmp_file_path,mode="single",extract_tables="markdown")
-            elif file_extension in [".txt", ".json", "md"]:
+            elif file_extension in [".txt", ".json", ".md"]:
                 loader = TextLoader(file_path=tmp_file_path, encoding="utf-8")
             elif file_extension in [".doc", ".docx"]:
                 loader  = UnstructuredWordDocumentLoader(file_path=tmp_file_path)
