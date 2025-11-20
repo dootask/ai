@@ -15,7 +15,7 @@ from langgraph.types import interrupt
 from pydantic import BaseModel, Field
 
 # Added logger
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 
 class AgentState(MessagesState, total=False):

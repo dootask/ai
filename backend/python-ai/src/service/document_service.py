@@ -7,11 +7,11 @@ from uuid import uuid4
 from core import get_embeddings_by_provider, settings
 from fastapi import HTTPException, UploadFile
 from langchain_community.document_loaders import (
-    CSVLoader, PyMuPDFLoader, UnstructuredMarkdownLoader, TextLoader, UnstructuredExcelLoader,
+    CSVLoader, PyMuPDFLoader, TextLoader, UnstructuredExcelLoader,
     UnstructuredWordDocumentLoader)
 from langchain_core.documents import Document
 from langchain_postgres import PGVector
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
@@ -73,10 +73,8 @@ class DocumentService:
             st = time.time()
             if file_extension == ".pdf":
                 loader = PyMuPDFLoader(file_path=tmp_file_path,mode="single",extract_tables="markdown")
-            elif file_extension in [".txt", ".json"]:
+            elif file_extension in [".txt", ".json", "md"]:
                 loader = TextLoader(file_path=tmp_file_path, encoding="utf-8")
-            elif file_extension in [".md"]:
-                loader = UnstructuredMarkdownLoader(file_path=tmp_file_path, mode="elements", strategy="fast")
             elif file_extension in [".doc", ".docx"]:
                 loader  = UnstructuredWordDocumentLoader(file_path=tmp_file_path)
             elif file_extension in [".csv"]:
@@ -88,8 +86,13 @@ class DocumentService:
                     status_code=400,
                     detail=f"不支持的文件类型: {file_extension}"
                 )
-            # 加载文档
-            documents = loader.load()
+            if file_extension == ".md":
+                headers_to_split_on = [("#", "H1"), ("##", "H2"), ("###", "H3"), ("####", "H4")]
+                markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
+                documents = markdown_splitter.split_text(loader.load()[0].page_content)
+            else:
+                # 加载文档
+                documents = loader.load()
 
             # 添加元数据
             for doc in documents:
@@ -117,7 +120,7 @@ class DocumentService:
         knowledge_base: str = "default_knowledge_base",
         provider: str = "openai", 
         model: str = "text-embedding-3-small",
-        api_key: str = None,
+        api_key: str = "",
         proxy_url: str | None = None
     ) -> dict:
         """上传并处理多个文档到指定知识库"""

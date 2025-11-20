@@ -10,7 +10,7 @@ from schema import (ChatHistory, ChatHistoryInput, ChatMessage, Feedback,
                     FeedbackResponse, StreamInput, UserInput)
 from service.chat_service import ChatService
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 
 # 应用认证依赖到所有路由

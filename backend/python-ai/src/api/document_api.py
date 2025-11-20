@@ -6,7 +6,7 @@ from fastapi import (APIRouter, Depends, File, Form, HTTPException, Query,
 from schema import DeleteResponse, KnowledgeBaseResponse, UploadResponse
 from service.document_service import DocumentService
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 router = APIRouter(prefix="/documents", dependencies=[Depends(verify_bearer),Depends(valid_content_length)],tags=["documents"])
 
 
