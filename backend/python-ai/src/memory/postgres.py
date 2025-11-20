@@ -8,7 +8,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from core.settings import settings
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 
 def validate_postgres_config() -> None:

@@ -6,7 +6,7 @@ from langgraph.checkpoint.mongodb.aio import AsyncMongoDBSaver
 
 from core.settings import settings
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 
 def _has_auth_credentials() -> bool:

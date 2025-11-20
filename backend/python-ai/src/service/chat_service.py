@@ -23,7 +23,7 @@ from service.utils import (convert_message_content_to_string,
 from service.document_service import DocumentService
 from fastapi import UploadFile
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 def parse_agent_config(value) -> dict:
     if isinstance(value, dict):
@@ -115,7 +115,7 @@ class ChatService:
             # 提取所有 Markdown 链接（含图片和普通链接）与纯 URL
             md_urls = re.findall(r'!?\[[^\]]*\]\((.*?)\)', original_text)
             text_without_images = re.sub(r'!?\[[^\]]*\]\(.*?\)', '', original_text)
-            pure_urls = re.findall(r'https?://[^\s)]+', original_text)
+            pure_urls = re.findall(r'https?://[^\s)\uFF09]+', original_text)
 
             # 合并并去重
             candidate_urls = list({*md_urls, *pure_urls})
@@ -150,6 +150,12 @@ class ChatService:
                     for url in file_urls:
                         try:
                             resp = await client.get(url)
+                            
+                            if resp.status_code == 308:
+                                # 处理重定向
+                                redirect_url = resp.headers.get("Location")
+                                if redirect_url:
+                                    resp = await client.get(redirect_url)
                             if resp.status_code != 200:
                                 continue
                             data = resp.content
