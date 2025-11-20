@@ -7,7 +7,7 @@ from uuid import uuid4
 from core import get_embeddings_by_provider, settings
 from fastapi import HTTPException, UploadFile
 from langchain_community.document_loaders import (
-    CSVLoader, PyMuPDFLoader, PyPDFLoader, TextLoader, UnstructuredExcelLoader,
+    CSVLoader, PyMuPDFLoader, UnstructuredMarkdownLoader, TextLoader, UnstructuredExcelLoader,
     UnstructuredWordDocumentLoader)
 from langchain_core.documents import Document
 from langchain_postgres import PGVector
@@ -73,8 +73,10 @@ class DocumentService:
             st = time.time()
             if file_extension == ".pdf":
                 loader = PyMuPDFLoader(file_path=tmp_file_path,mode="single",extract_tables="markdown")
-            elif file_extension in [".txt", ".md", ".json"]:
+            elif file_extension in [".txt", ".json"]:
                 loader = TextLoader(file_path=tmp_file_path, encoding="utf-8")
+            elif file_extension in [".md"]:
+                loader = UnstructuredMarkdownLoader(file_path=tmp_file_path, mode="elements", strategy="fast")
             elif file_extension in [".doc", ".docx"]:
                 loader  = UnstructuredWordDocumentLoader(file_path=tmp_file_path)
             elif file_extension in [".csv"]:
