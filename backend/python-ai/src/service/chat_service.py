@@ -174,7 +174,7 @@ class ChatService:
 
             # 纯文本（移除图片与文件链接标记）
             text_without_files = re.sub(r'(?<!\!)\[[^\]]*\]\(.*?\)', '', text_without_images)
-            text_without_files = re.sub(r'https?://[^\s)]+', '', text_without_files).strip()
+            text_without_files = re.sub(r'https?://[^\s)\uFF09]+', '', text_without_files).strip()
 
             # 将文本与解析出的文档内容合并
             final_text_parts = []
@@ -189,8 +189,8 @@ class ChatService:
                 })
 
             if content_list and isinstance(input, dict):
-                input["messages"] = input["messages"] + [HumanMessage(content=content_list)]
-
+                input["messages"] = [HumanMessage(content=content_list)]
+        # logger.info("--------------------- %s", input)
         kwargs = {
             "input": input,
             "config": config,
