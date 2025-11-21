@@ -41,7 +41,7 @@ def get_postgres_connection_string() -> str:
     return f"postgresql+psycopg://{settings.POSTGRES_USER}:{password}@{settings.POSTGRES_HOST}:{port}/{settings.POSTGRES_DB}"
 
 
-def load_postgres_vectorstore(rag_config: list = None):
+def load_postgres_vectorstore(rag_config: list = []):
     """加载PostgreSQL向量存储"""
     # 获取PostgreSQL连接字符串
     connection_string = get_postgres_connection_string()
@@ -130,10 +130,32 @@ async def retrieve_documents(state: AgentState, config: RunnableConfig) -> Agent
 
     # Use the last human message as the query
     query = human_messages[-1].content
+    if isinstance(query, list) and len(query) > 0:
+        # 获取最后一个消息
+        last_message = query[-1]
+        
+        # 处理不同的消息格式
+        if isinstance(last_message, HumanMessage):
+            content = last_message.content
+            
+            if isinstance(content, str):
+                # 简单文本格式
+                query = content
+            elif isinstance(content, list):
+                # 复杂结构格式：提取第一个文本内容
+                text_contents = [item['text'] for item in content if isinstance(item, dict) and item.get('type') == 'text']
+                query = text_contents[0] if text_contents else ""
+            else:
+                query = str(content)
+        else:
+            query = str(last_message)
+    elif not isinstance(query, str):
+        query = str(query)
+    
 
     try:
         # Initialize the retriever
-        configurable = config.get("configurable").get("rag_config")
+        configurable = config.get("configurable",{}).get("rag_config",{})
         configurable = json.loads(configurable) if configurable else []
         # 获取PostgreSQL检索器
         retriever = load_postgres_vectorstore(rag_config=configurable)
@@ -158,7 +180,7 @@ async def retrieve_documents(state: AgentState, config: RunnableConfig) -> Agent
         return {"retrieved_documents": document_summaries, "messages": []}
 
     except Exception as e:
-        logger.error(f"Error retrieving documents: {str(e)}")
+        logger.exception(f"Error retrieving documents: {str(e)}")
         return {"retrieved_documents": [], "messages": []}
 
 
@@ -195,7 +217,7 @@ async def acall_model(state: AgentState, config: RunnableConfig) -> AgentState:
         configurable.get("model", settings.DEFAULT_MODEL),
         configurable.get("agent_config", None),
     )
-    agent_config = json.loads(configurable.get("agent_config", None)) if configurable.get("agent_config", None) else {}
+    agent_config = json.loads(configurable.get("agent_config", {})) if configurable.get("agent_config", {}) else {}
     model_runnable = wrap_model(m,agent_config.get("prompt"))
     response = await model_runnable.ainvoke(state, config)
 
